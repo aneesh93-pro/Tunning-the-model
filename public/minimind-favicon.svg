@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <rect width="64" height="64" rx="16" fill="#090B10"/>
+  <rect x="4" y="4" width="56" height="56" rx="12" stroke="#1E3A8A" stroke-width="1.5"/>
+  <!-- Frozen base W0 pedestal -->
+  <rect x="14" y="44" width="36" height="8" rx="3" fill="#1E293B" stroke="#3B82F6" stroke-width="1.5"/>
+  <!-- LoRA Adapter Ring A -->
+  <ellipse cx="32" cy="30" rx="20" ry="9" transform="rotate(-24 32 30)" stroke="#3B82F6" stroke-width="3"/>
+  <!-- LoRA Adapter Ring B -->
+  <ellipse cx="32" cy="30" rx="17" ry="8" transform="rotate(24 32 30)" stroke="#06B6D4" stroke-width="2.5"/>
+  <!-- Verification Halo Crown -->
+  <ellipse cx="32" cy="14" rx="11" ry="3.5" stroke="#E2E8F0" stroke-width="1.8"/>
+  <!-- NF4 Central Neural Core -->
+  <polygon points="32,20 40,26 37,36 27,36 24,26" fill="#6366F1" stroke="#A5B4FC" stroke-width="1.5"/>
+  <!-- 4 Pipeline Satellite Nodes -->
+  <circle cx="15" cy="24" r="2.6" fill="#38BDF8"/>
+  <circle cx="49" cy="24" r="2.6" fill="#10B981"/>
+  <circle cx="32" cy="40" r="2.6" fill="#8B5CF6"/>
+</svg>

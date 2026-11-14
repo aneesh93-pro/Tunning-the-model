@@ -1,0 +1,6 @@
+{
+  "name": "MiniMind AI",
+  "description": "Custom LLM Fine-Tuning Studio for LoRA & QLoRA training, dataset preprocessing, real-time monitoring, evaluation, model comparison, and inference playground.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

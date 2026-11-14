@@ -1,11 +1,29 @@
-<div align="center">
+# MiniMind AI — Custom LLM Fine-Tuning Studio
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+Full-stack Small Language Model (SLM) fine-tuning platform supporting dataset ingestion and leakage-free splitting, architecture-aware LoRA and 4-bit NF4 QLoRA training, live SSE metric streaming, held-out test evaluation, side-by-side model comparison, streaming inference playground, and reproducible adapter registry.
 
-  <h1>Built with AI Studio</h2>
+## Architecture
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+- **Frontend**: React 19 + TypeScript + Tailwind CSS + Recharts + ReactBits (`SpotlightCard`, `CountUp`, `BlurText`, `DotGrid`)
+- **Live Server & Local Training Engine**: Express + `node:sqlite` (`data/minimind.db`) + CPU-native LoRA / 4-bit NF4 QLoRA backpropagation engine (`src/ml/loraEngine.ts`) + `@google/genai` streaming inference (`server/inferenceService.ts`)
+- **GPU Cloud Worker Stack (`/backend`)**: FastAPI + SQLAlchemy + PostgreSQL + PyTorch + Hugging Face Transformers + PEFT + TRL + BitsAndBytes + Docker Compose (`docker-compose.yml`)
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+## Local Development
 
-</div>
+```bash
+npm install
+npm run dev
+```
+
+## Unit Tests
+
+```bash
+npx --yes tsx --test src/ml/datasetProcessor.test.ts src/ml/loraEngine.test.ts
+```
+
+## Build & Production
+
+```bash
+npm run build
+npm run start
+```

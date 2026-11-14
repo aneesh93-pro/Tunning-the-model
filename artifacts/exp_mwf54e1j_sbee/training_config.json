@@ -1,0 +1,31 @@
+{
+  "experimentName": "Banking Intent QLoRA R2",
+  "description": "Supervised fine-tuning with low-rank adaptation on held-out split.",
+  "datasetId": "ds_banking_intents",
+  "modelId": "qwen2.5-0.5b-instruct",
+  "method": "qlora",
+  "loraR": 8,
+  "loraAlpha": 16,
+  "loraDropout": 0.05,
+  "targetModules": [
+    "q_proj",
+    "v_proj"
+  ],
+  "bias": "none",
+  "quantizationBits": 4,
+  "quantType": "nf4",
+  "doubleQuant": true,
+  "computeDtype": "bfloat16",
+  "gradientCheckpointing": true,
+  "learningRate": 0.035,
+  "epochs": 14,
+  "batchSize": 4,
+  "gradientAccumulation": 1,
+  "maxSeqLength": 256,
+  "weightDecay": 0.005,
+  "warmupRatio": 0.1,
+  "optimizer": "adamw",
+  "scheduler": "cosine",
+  "earlyStoppingPatience": 4,
+  "seed": 42
+}
