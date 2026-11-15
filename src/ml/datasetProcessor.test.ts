@@ -4,6 +4,8 @@ import {
   detectDatasetFormat,
   parseDatasetContent,
   preprocessAndSplitDataset,
+  rowsToCsv,
+  rowsToJsonl,
   validateDatasetRows,
 } from './datasetProcessor';
 
@@ -58,4 +60,21 @@ test('preprocessAndSplitDataset deduplicates and guarantees zero data leakage ac
   assert.ok(bundle.train.length > 0);
   assert.ok(bundle.validation.length > 0);
   assert.ok(bundle.test.length > 0);
+});
+
+test('rowsToCsv and rowsToJsonl serialize processed rows cleanly with round-trip fidelity', () => {
+  const rows = [
+    { instruction: 'Classify intent', input: 'Card "missing", urgent!', output: 'card_lost_or_stolen' },
+    { instruction: 'Classify intent', input: 'Wire $500 to checking', output: 'internal_transfer' },
+  ];
+  const csv = rowsToCsv(rows);
+  const parsedFromCsv = parseDatasetContent(csv, 'csv');
+  assert.equal(parsedFromCsv.length, 2);
+  assert.equal(parsedFromCsv[0].input, 'Card "missing", urgent!');
+  assert.equal(parsedFromCsv[1].output, 'internal_transfer');
+
+  const jsonl = rowsToJsonl(rows);
+  const parsedFromJsonl = parseDatasetContent(jsonl, 'jsonl');
+  assert.equal(parsedFromJsonl.length, 2);
+  assert.equal(parsedFromJsonl[0].output, 'card_lost_or_stolen');
 });

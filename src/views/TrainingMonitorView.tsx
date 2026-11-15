@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  AlertTriangle,
   Download,
   Pause,
   Play,
@@ -52,26 +53,35 @@ export function TrainingMonitorView({
   >([]);
   const [logs, setLogs] = useState<string[]>([]);
   const [hardware, setHardware] = useState<HardwareTelemetry | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const logContainerRef = useRef<HTMLDivElement>(null);
 
   const loadListAndDetail = async (targetId?: string | null) => {
-    const list = await api.getExperiments();
-    setExperiments(list);
-    const id = targetId || activeExperimentId || list[0]?.id || null;
-    if (!id) {
-      setSelectedExp(null);
-      setMetrics([]);
-      setCheckpoints([]);
-      setLogs([]);
-      return;
+    try {
+      const list = await api.getExperiments();
+      setExperiments(list);
+      const id = targetId || activeExperimentId || list[0]?.id || null;
+      if (!id) {
+        setSelectedExp(null);
+        setMetrics([]);
+        setCheckpoints([]);
+        setLogs([]);
+        setError(null);
+        return;
+      }
+      if (!activeExperimentId && id !== activeExperimentId) {
+        onSelectExperiment(id);
+      }
+      const detail = await api.getExperimentDetail(id);
+      setSelectedExp(detail.experiment);
+      setMetrics(detail.metrics);
+      setCheckpoints(detail.checkpoints);
+      setLogs(detail.logs);
+      setHardware(detail.hardware);
+      setError(null);
+    } catch (err) {
+      setError((err as Error).message);
     }
-    if (id !== activeExperimentId) onSelectExperiment(id);
-    const detail = await api.getExperimentDetail(id);
-    setSelectedExp(detail.experiment);
-    setMetrics(detail.metrics);
-    setCheckpoints(detail.checkpoints);
-    setLogs(detail.logs);
-    setHardware(detail.hardware);
   };
 
   useEffect(() => {
@@ -201,6 +211,13 @@ export function TrainingMonitorView({
         </div>
       </div>
 
+      {error && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-red-600 dark:text-red-400 flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
       {!selectedExp ? (
         <div className="rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] p-12 text-center">
           <Terminal className="w-8 h-8 text-slate-400 mx-auto mb-2" />
@@ -253,7 +270,12 @@ export function TrainingMonitorView({
                 {selectedExp.status === 'running' && (
                   <button
                     type="button"
-                    onClick={() => api.pauseTraining(selectedExp.id).then(() => loadListAndDetail(selectedExp.id))}
+                    onClick={() =>
+                      api
+                        .pauseTraining(selectedExp.id)
+                        .then(() => loadListAndDetail(selectedExp.id))
+                        .catch((err) => setError((err as Error).message))
+                    }
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-white/[0.1] hover:bg-slate-50 dark:hover:bg-white/[0.04]"
                   >
                     <Pause className="w-3.5 h-3.5" />
@@ -263,7 +285,12 @@ export function TrainingMonitorView({
                 {selectedExp.status === 'paused' && (
                   <button
                     type="button"
-                    onClick={() => api.resumeTraining(selectedExp.id).then(() => loadListAndDetail(selectedExp.id))}
+                    onClick={() =>
+                      api
+                        .resumeTraining(selectedExp.id)
+                        .then(() => loadListAndDetail(selectedExp.id))
+                        .catch((err) => setError((err as Error).message))
+                    }
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-500"
                   >
                     <Play className="w-3.5 h-3.5" />
@@ -275,7 +302,12 @@ export function TrainingMonitorView({
                   selectedExp.status === 'preparing') && (
                   <button
                     type="button"
-                    onClick={() => api.cancelTraining(selectedExp.id).then(() => loadListAndDetail(selectedExp.id))}
+                    onClick={() =>
+                      api
+                        .cancelTraining(selectedExp.id)
+                        .then(() => loadListAndDetail(selectedExp.id))
+                        .catch((err) => setError((err as Error).message))
+                    }
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-500/10"
                   >
                     <Square className="w-3.5 h-3.5" />
@@ -363,7 +395,10 @@ export function TrainingMonitorView({
                         borderColor: 'rgba(255,255,255,0.1)',
                         borderRadius: '8px',
                         fontSize: '12px',
+                        color: '#F8FAFC',
                       }}
+                      itemStyle={{ color: '#E2E8F0' }}
+                      labelStyle={{ color: '#94A3B8', marginBottom: '4px' }}
                     />
                     <Line
                       type="monotone"
@@ -406,7 +441,10 @@ export function TrainingMonitorView({
                         borderColor: 'rgba(255,255,255,0.1)',
                         borderRadius: '8px',
                         fontSize: '12px',
+                        color: '#F8FAFC',
                       }}
+                      itemStyle={{ color: '#E2E8F0' }}
+                      labelStyle={{ color: '#94A3B8', marginBottom: '4px' }}
                     />
                     <Area
                       yAxisId="left"

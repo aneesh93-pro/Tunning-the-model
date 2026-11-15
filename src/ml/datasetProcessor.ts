@@ -530,3 +530,40 @@ export function preprocessAndSplitDataset(
     report,
   };
 }
+
+function escapeCsvCell(value: unknown): string {
+  const raw =
+    value === null || value === undefined
+      ? ''
+      : typeof value === 'object'
+        ? JSON.stringify(value)
+        : String(value);
+  if (/[",\n\r]/.test(raw)) {
+    return `"${raw.replace(/"/g, '""')}"`;
+  }
+  return raw;
+}
+
+export function rowsToJsonl(rows: RawRow[]): string {
+  return rows.map((r) => JSON.stringify(r)).join('\n');
+}
+
+export function rowsToCsv(rows: RawRow[]): string {
+  if (rows.length === 0) return '';
+  const headers: string[] = [];
+  const seen = new Set<string>();
+  for (const row of rows) {
+    for (const key of Object.keys(row)) {
+      if (!seen.has(key)) {
+        seen.add(key);
+        headers.push(key);
+      }
+    }
+  }
+  const lines = [headers.map(escapeCsvCell).join(',')];
+  for (const row of rows) {
+    lines.push(headers.map((h) => escapeCsvCell(row[h])).join(','));
+  }
+  return lines.join('\n');
+}
+

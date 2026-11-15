@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Key, Shield, Trash2 } from 'lucide-react';
+import { AlertTriangle, Key, Shield, Trash2 } from 'lucide-react';
 import { RubberSegment } from '../components/reactbits/RubberSegment';
 import { api } from '../lib/api';
 import { useIsDark } from '../lib/useDarkMode';
@@ -40,15 +40,21 @@ export function SettingsView({
   const [newKeyRole, setNewKeyRole] = useState('engineer');
   const [revealedSecret, setRevealedSecret] = useState<string | null>(null);
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const loadSettings = async () => {
-    const s = await api.getSettings();
-    setWsName(s.workspace.name);
-    setWsDesc(s.workspace.description);
-    setApiKeys(s.apiKeys);
-    setAuditLogs(s.auditLogs);
-    setHardware(s.hardware);
-    setGeminiConfigured(s.geminiConfigured);
+    try {
+      const s = await api.getSettings();
+      setWsName(s.workspace.name);
+      setWsDesc(s.workspace.description);
+      setApiKeys(s.apiKeys);
+      setAuditLogs(s.auditLogs);
+      setHardware(s.hardware);
+      setGeminiConfigured(s.geminiConfigured);
+      setError(null);
+    } catch (err) {
+      setError((err as Error).message);
+    }
   };
 
   useEffect(() => {
@@ -57,19 +63,36 @@ export function SettingsView({
 
   const handleSaveWorkspace = async (e: React.FormEvent) => {
     e.preventDefault();
-    await api.updateWorkspace(wsName, wsDesc);
-    setSavedNotice('Workspace settings saved.');
-    onWorkspaceUpdated();
-    setTimeout(() => setSavedNotice(null), 2500);
+    if (!wsName.trim()) {
+      setError('Workspace name is required.');
+      return;
+    }
+    try {
+      await api.updateWorkspace(wsName.trim(), wsDesc);
+      setError(null);
+      setSavedNotice('Workspace settings saved.');
+      onWorkspaceUpdated();
+      setTimeout(() => setSavedNotice(null), 2500);
+    } catch (err) {
+      setError((err as Error).message);
+    }
   };
 
   const handleCreateKey = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newKeyName.trim()) return;
-    const res = await api.createApiKey(newKeyName.trim(), newKeyRole);
-    setRevealedSecret(res.secretToken);
-    setNewKeyName('');
-    await loadSettings();
+    if (!newKeyName.trim()) {
+      setError('Token label is required.');
+      return;
+    }
+    try {
+      const res = await api.createApiKey(newKeyName.trim(), newKeyRole);
+      setRevealedSecret(res.secretToken);
+      setNewKeyName('');
+      setError(null);
+      await loadSettings();
+    } catch (err) {
+      setError((err as Error).message);
+    }
   };
 
   return (
@@ -82,6 +105,13 @@ export function SettingsView({
           Configure workspace metadata, appearance, RBAC API tokens, runtime diagnostics, and audit trails.
         </p>
       </div>
+
+      {error && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-red-600 dark:text-red-400 flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Workspace & Theme */}
@@ -239,7 +269,12 @@ export function SettingsView({
                   <td className="py-2 text-right">
                     <button
                       type="button"
-                      onClick={() => api.revokeApiKey(k.id).then(loadSettings)}
+                      onClick={() =>
+                        api
+                          .revokeApiKey(k.id)
+                          .then(loadSettings)
+                          .catch((err) => setError((err as Error).message))
+                      }
                       className="text-red-500 hover:underline inline-flex items-center gap-1"
                     >
                       <Trash2 className="w-3 h-3" /> Revoke

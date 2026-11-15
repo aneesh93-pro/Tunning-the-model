@@ -77,6 +77,8 @@ export function FineTuningStudioView({
       } else if (!datasetId && ds.length > 0) {
         setDatasetId(ds[0].id);
       }
+    }).catch((err) => {
+      setError((err as Error).message);
     });
   }, []);
 
@@ -192,6 +194,21 @@ export function FineTuningStudioView({
               setError('Experiment name is required.');
               return;
             }
+            if (
+              (method !== 'full' && (!Number.isFinite(loraR) || loraR < 1 || !Number.isFinite(loraAlpha) || loraAlpha < 1)) ||
+              !Number.isFinite(learningRate) ||
+              learningRate <= 0 ||
+              !Number.isFinite(epochs) ||
+              epochs < 1 ||
+              !Number.isFinite(batchSize) ||
+              batchSize < 1 ||
+              !Number.isFinite(maxSeqLength) ||
+              maxSeqLength < 64
+            ) {
+              setError('Enter valid positive numeric hyperparameters (Rank, Alpha, LR, Epochs, Batch Size, Seq Length).');
+              return;
+            }
+            setError(null);
             setShowConfirm(true);
           }}
           color="#60A5FA"
@@ -255,15 +272,25 @@ export function FineTuningStudioView({
                   Pretrained Base Model
                 </label>
                 <select
+                  aria-label="Pretrained Base Model"
                   value={modelId}
                   onChange={(e) => setModelId(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-white/[0.1] bg-slate-50 dark:bg-[#090B10]"
                 >
-                  {PRETRAINED_MODELS.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name} ({m.parameterCount})
-                    </option>
-                  ))}
+                  <optgroup label="Recommended Local CPU / QLoRA SLMs">
+                    {PRETRAINED_MODELS.filter((m) => m.trainableLocally !== false).map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name} ({m.parameterCount})
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Frontier & Open-Weight Architectures">
+                    {PRETRAINED_MODELS.filter((m) => m.trainableLocally === false).map((m) => (
+                      <option key={m.id} value={m.id}>
+                        [{m.aiTool ?? m.source}] {m.name} ({m.parameterCount})
+                      </option>
+                    ))}
+                  </optgroup>
                 </select>
               </div>
               <div>

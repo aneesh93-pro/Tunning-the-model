@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { History, Search } from 'lucide-react';
+import { AlertTriangle, History, Search } from 'lucide-react';
 import { api } from '../lib/api';
 import { formatDuration, formatNumber } from '../lib/utils';
 import type { ExperimentRecord } from '../shared/types';
@@ -13,9 +13,16 @@ export function ExperimentHistoryView({ onOpenMonitor }: ExperimentHistoryViewPr
   const [query, setQuery] = useState('');
   const [methodFilter, setMethodFilter] = useState<string>('all');
   const [selected, setSelected] = useState<ExperimentRecord | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.getExperiments().then(setExperiments);
+    api
+      .getExperiments()
+      .then((list) => {
+        setExperiments(list);
+        setError(null);
+      })
+      .catch((err) => setError((err as Error).message));
   }, []);
 
   const filtered = experiments.filter((exp) => {
@@ -64,6 +71,13 @@ export function ExperimentHistoryView({ onOpenMonitor }: ExperimentHistoryViewPr
           </select>
         </div>
       </div>
+
+      {error && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-red-600 dark:text-red-400 flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
 
       {filtered.length === 0 ? (
         <div className="rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] p-12 text-center">

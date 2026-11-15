@@ -1,14 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import {
   AlertTriangle,
+  Archive,
   CheckCircle2,
   Download,
+  FileCode2,
   FileSpreadsheet,
+  FlaskConical,
+  Layers,
   SlidersHorizontal,
+  Sparkles,
   Trash2,
   Upload,
 } from 'lucide-react';
+import GlassIcons, { type GlassIconsItem } from '../components/reactbits/GlassIcons';
 import { api } from '../lib/api';
+import { useIsDark } from '../lib/useDarkMode';
 import { formatBytes } from '../lib/utils';
 import type { DatasetRecord } from '../shared/types';
 import type { NavSection } from './OverviewView';
@@ -32,9 +39,18 @@ export function DatasetManagerView({
   onSelectForTraining,
   onNavigate,
 }: DatasetManagerViewProps) {
+  const isDark = useIsDark();
   const [datasets, setDatasets] = useState<DatasetRecord[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [previewRows, setPreviewRows] = useState<Record<string, unknown>[]>([]);
+  const [processedPreview, setProcessedPreview] = useState<{
+    cleanedSample?: Record<string, unknown>[];
+    trainSample: Record<string, unknown>[];
+    valSample: Record<string, unknown>[];
+    testSample: Record<string, unknown>[];
+  } | null>(null);
+  const [previewTab, setPreviewTab] = useState<'raw' | 'cleaned' | 'train' | 'val' | 'test'>('raw');
+  const [exportFormat, setExportFormat] = useState<'jsonl' | 'csv' | 'json'>('jsonl');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,19 +75,36 @@ export function DatasetManagerView({
   const [mapInput, setMapInput] = useState('');
   const [mapOutput, setMapOutput] = useState('');
 
+  const triggerDownload = (url: string) => {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = '';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
+
   const loadDatasets = async (preserveId?: string) => {
     setLoading(true);
     try {
       const list = await api.getDatasets();
       setDatasets(list);
-      const target = preserveId || selectedId || list[0]?.id || null;
+      const target = preserveId || (selectedId && list.some((d) => d.id === selectedId) ? selectedId : list[0]?.id) || null;
       if (target && list.some((d) => d.id === target)) {
         setSelectedId(target);
         const detail = await api.getDatasetDetail(target);
         setPreviewRows(detail.previewRows);
+        setProcessedPreview(detail.processedPreview);
         setMapInstruction(detail.dataset.columnMapping?.instruction || '');
         setMapInput(detail.dataset.columnMapping?.input || '');
         setMapOutput(detail.dataset.columnMapping?.output || '');
+      } else {
+        setSelectedId(null);
+        setPreviewRows([]);
+        setProcessedPreview(null);
+        setMapInstruction('');
+        setMapInput('');
+        setMapOutput('');
       }
     } catch (err) {
       setError((err as Error).message);
@@ -88,9 +121,11 @@ export function DatasetManagerView({
     setSelectedId(id);
     setError(null);
     setNotice(null);
+    setPreviewTab('raw');
     try {
       const detail = await api.getDatasetDetail(id);
       setPreviewRows(detail.previewRows);
+      setProcessedPreview(detail.processedPreview);
       setMapInstruction(detail.dataset.columnMapping?.instruction || '');
       setMapInput(detail.dataset.columnMapping?.input || '');
       setMapOutput(detail.dataset.columnMapping?.output || '');
@@ -191,8 +226,9 @@ export function DatasetManagerView({
         columnMapping: mapping,
       });
       setNotice(
-        `Dataset training-ready: ${updated.splits?.trainCount} train / ${updated.splits?.valCount} val / ${updated.splits?.testCount} test (0 leakage overlap).`
+        `Dataset training-ready: ${updated.splits?.trainCount} train / ${updated.splits?.valCount} val / ${updated.splits?.testCount} test (0 leakage overlap). Your processed dataset & splits are ready to download below.`
       );
+      setPreviewTab('cleaned');
       await loadDatasets(selected.id);
     } catch (err) {
       setError((err as Error).message);
@@ -607,36 +643,240 @@ export function DatasetManagerView({
                 </div>
               </div>
 
+              {/* Processed Dataset Output & Downloads */}
+              <section
+                aria-label="Processed dataset downloads"
+                className="rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] p-5 space-y-5"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                      Processed Dataset Output &amp; Export
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {selected.status === 'training_ready' && selected.splits
+                        ? `All pipeline steps complete — download the cleaned corpus, isolated splits (${selected.splits.trainCount}/${selected.splits.valCount}/${selected.splits.testCount}), or a full ZIP archive.`
+                        : 'Run "Preprocess & Split" above to clean, deduplicate, and unlock Train / Val / Test split & ZIP downloads.'}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mr-1">
+                      Format:
+                    </span>
+                    {(['jsonl', 'csv', 'json'] as const).map((fmt) => (
+                      <button
+                        key={fmt}
+                        type="button"
+                        onClick={() => setExportFormat(fmt)}
+                        className={`px-2.5 py-1 text-[11px] font-mono uppercase rounded-md border transition-colors ${
+                          exportFormat === fmt
+                            ? 'border-blue-500 bg-blue-600 text-white'
+                            : 'border-slate-200 dark:border-white/[0.1] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.04]'
+                        }`}
+                      >
+                        {fmt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {selected.status === 'training_ready' && selected.splits ? (
+                  <>
+                    <div className="pt-1 pb-6">
+                      <GlassIcons
+                        size={56}
+                        gap={38}
+                        columns={5}
+                        roundness={0.52}
+                        refraction={0.7}
+                        bevel={0.5}
+                        frost={0.22}
+                        shine={0.85}
+                        tint={isDark ? '#dfdfdf' : '#ffffff'}
+                        tintOpacity={isDark ? 0.18 : 0.28}
+                        plate="tilt"
+                        tilt={24}
+                        hover="lift"
+                        labels="always"
+                        intro={false}
+                        theme={isDark ? 'dark' : 'light'}
+                        items={[
+                          {
+                            id: 'dl-cleaned',
+                            icon: <Sparkles />,
+                            color: 'blue',
+                            label: `Cleaned (${selected.rowCount - selected.duplicateCount - selected.missingCount > 0 ? selected.splits.trainCount + selected.splits.valCount + selected.splits.testCount : selected.rowCount})`,
+                            onClick: () =>
+                              triggerDownload(
+                                `/api/datasets/${selected.id}/export?split=cleaned&format=${exportFormat}`
+                              ),
+                          },
+                          {
+                            id: 'dl-train',
+                            icon: <FlaskConical />,
+                            color: 'green',
+                            label: `Train (${selected.splits.trainCount})`,
+                            onClick: () =>
+                              triggerDownload(
+                                `/api/datasets/${selected.id}/export?split=train&format=${exportFormat}`
+                              ),
+                          },
+                          {
+                            id: 'dl-val',
+                            icon: <Layers />,
+                            color: 'purple',
+                            label: `Val (${selected.splits.valCount})`,
+                            onClick: () =>
+                              triggerDownload(
+                                `/api/datasets/${selected.id}/export?split=val&format=${exportFormat}`
+                              ),
+                          },
+                          {
+                            id: 'dl-test',
+                            icon: <FileCode2 />,
+                            color: 'orange',
+                            label: `Test (${selected.splits.testCount})`,
+                            onClick: () =>
+                              triggerDownload(
+                                `/api/datasets/${selected.id}/export?split=test&format=${exportFormat}`
+                              ),
+                          },
+                          {
+                            id: 'dl-zip',
+                            icon: <Archive />,
+                            color: 'teal',
+                            label: 'Full ZIP Bundle',
+                            onClick: () =>
+                              triggerDownload(`/api/datasets/${selected.id}/export?split=all&format=zip`),
+                          },
+                        ] satisfies GlassIconsItem[]}
+                      />
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-slate-200 dark:border-white/[0.06]">
+                      <a
+                        href={`/api/datasets/${selected.id}/export?split=cleaned&format=${exportFormat}`}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-white/[0.1] hover:bg-slate-50 dark:hover:bg-white/[0.04]"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        Cleaned .{exportFormat}
+                      </a>
+                      <a
+                        href={`/api/datasets/${selected.id}/export?split=train&format=${exportFormat}`}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-white/[0.1] hover:bg-slate-50 dark:hover:bg-white/[0.04]"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        Train Split ({selected.splits.trainCount})
+                      </a>
+                      <a
+                        href={`/api/datasets/${selected.id}/export?split=val&format=${exportFormat}`}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-white/[0.1] hover:bg-slate-50 dark:hover:bg-white/[0.04]"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        Val Split ({selected.splits.valCount})
+                      </a>
+                      <a
+                        href={`/api/datasets/${selected.id}/export?split=test&format=${exportFormat}`}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-white/[0.1] hover:bg-slate-50 dark:hover:bg-white/[0.04]"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        Test Split ({selected.splits.testCount})
+                      </a>
+                      <a
+                        href={`/api/datasets/${selected.id}/export?split=all&format=zip`}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-500 ml-auto"
+                      >
+                        <Archive className="w-3.5 h-3.5" />
+                        Download Complete Bundle (.zip)
+                      </a>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-slate-200 dark:border-white/[0.1] p-4 text-xs text-slate-500 dark:text-slate-400">
+                    <span>
+                      Current status: <strong className="font-mono text-slate-700 dark:text-slate-200">{selected.status}</strong>. Click &ldquo;Preprocess &amp; Split&rdquo; to generate downloadable cleaned &amp; split datasets.
+                    </span>
+                    <a
+                      href={`/api/datasets/${selected.id}/export?split=cleaned&format=${exportFormat}`}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-white/[0.1] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.04]"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      Download Raw as .{exportFormat}
+                    </a>
+                  </div>
+                )}
+              </section>
+
               {/* Sample Row Preview */}
-              <div className="rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] overflow-hidden">
-                <div className="px-5 py-3 border-b border-slate-200 dark:border-white/[0.08]">
-                  <h3 className="text-xs font-semibold text-slate-900 dark:text-slate-100">
-                    Row Preview (First {previewRows.length} Records)
-                  </h3>
-                </div>
-                <div className="overflow-x-auto max-h-72">
-                  <table className="w-full text-left text-xs">
-                    <thead className="border-b border-slate-200 dark:border-white/[0.06] text-slate-500 dark:text-slate-400">
-                      <tr>
-                        <th className="py-2 px-4 font-medium w-12">#</th>
-                        <th className="py-2 px-4 font-medium">Payload</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200 dark:divide-white/[0.06] font-mono">
-                      {previewRows.map((row, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-white/[0.02]">
-                          <td className="py-2 px-4 text-slate-400 tabular-nums align-top">
-                            {idx + 1}
-                          </td>
-                          <td className="py-2 px-4 text-slate-700 dark:text-slate-300 whitespace-pre-wrap break-words">
-                            {JSON.stringify(row)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              {(() => {
+                const activePreviewRows =
+                  previewTab === 'cleaned' && processedPreview?.cleanedSample
+                    ? processedPreview.cleanedSample
+                    : previewTab === 'train' && processedPreview?.trainSample
+                      ? processedPreview.trainSample
+                      : previewTab === 'val' && processedPreview?.valSample
+                        ? processedPreview.valSample
+                        : previewTab === 'test' && processedPreview?.testSample
+                          ? processedPreview.testSample
+                          : previewRows;
+                return (
+                  <div className="rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] overflow-hidden">
+                    <div className="px-5 py-3 border-b border-slate-200 dark:border-white/[0.08] flex flex-wrap items-center justify-between gap-3">
+                      <h3 className="text-xs font-semibold text-slate-900 dark:text-slate-100">
+                        Row Preview ({activePreviewRows.length} Records)
+                      </h3>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {(
+                          [
+                            { id: 'raw', label: 'Raw Input', enabled: true },
+                            { id: 'cleaned', label: 'Cleaned', enabled: Boolean(processedPreview?.cleanedSample) },
+                            { id: 'train', label: 'Train Split', enabled: Boolean(processedPreview?.trainSample) },
+                            { id: 'val', label: 'Val Split', enabled: Boolean(processedPreview?.valSample) },
+                            { id: 'test', label: 'Test Split', enabled: Boolean(processedPreview?.testSample) },
+                          ] as const
+                        )
+                          .filter((t) => t.enabled)
+                          .map((t) => (
+                            <button
+                              key={t.id}
+                              type="button"
+                              onClick={() => setPreviewTab(t.id)}
+                              className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors ${
+                                previewTab === t.id
+                                  ? 'bg-blue-600 text-white'
+                                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/[0.05]'
+                              }`}
+                            >
+                              {t.label}
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                    <div className="overflow-x-auto max-h-72">
+                      <table className="w-full text-left text-xs">
+                        <thead className="border-b border-slate-200 dark:border-white/[0.06] text-slate-500 dark:text-slate-400">
+                          <tr>
+                            <th className="py-2 px-4 font-medium w-12">#</th>
+                            <th className="py-2 px-4 font-medium">Payload</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200 dark:divide-white/[0.06] font-mono">
+                          {activePreviewRows.map((row, idx) => (
+                            <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-white/[0.02]">
+                              <td className="py-2 px-4 text-slate-400 tabular-nums align-top">
+                                {idx + 1}
+                              </td>
+                              <td className="py-2 px-4 text-slate-700 dark:text-slate-300 whitespace-pre-wrap break-words">
+                                {JSON.stringify(row)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
             </>
           )}
         </div>

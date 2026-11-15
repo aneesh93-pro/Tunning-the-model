@@ -25,6 +25,8 @@ import {
 import {
   parseDatasetContent,
   preprocessAndSplitDataset,
+  rowsToCsv,
+  rowsToJsonl,
   validateDatasetRows,
   type ProcessedDatasetBundle,
   type RawRow,
@@ -454,9 +456,10 @@ export function createApiRouter() {
         previewRows: rawRows.slice(0, 25),
         processedPreview: processedBundle
           ? {
-              trainSample: processedBundle.train.slice(0, 5),
-              valSample: processedBundle.validation.slice(0, 5),
-              testSample: processedBundle.test.slice(0, 5),
+              cleanedSample: processedBundle.cleanedRows.slice(0, 12),
+              trainSample: processedBundle.train.slice(0, 12).map((e) => e.raw),
+              valSample: processedBundle.validation.slice(0, 12).map((e) => e.raw),
+              testSample: processedBundle.test.slice(0, 12).map((e) => e.raw),
             }
           : null,
       });
@@ -508,15 +511,31 @@ export function createApiRouter() {
         return;
       }
 
+      const trainRatio = Number(req.body?.trainRatio ?? 0.7);
+      const valRatio = Number(req.body?.valRatio ?? 0.15);
+      const testRatio = Number(req.body?.testRatio ?? 0.15);
+      if (
+        !Number.isFinite(trainRatio) ||
+        !Number.isFinite(valRatio) ||
+        !Number.isFinite(testRatio) ||
+        trainRatio <= 0 ||
+        valRatio <= 0 ||
+        testRatio <= 0 ||
+        Math.abs(trainRatio + valRatio + testRatio - 1) > 0.02
+      ) {
+        res.status(400).json({ error: 'Split ratios must be positive numbers summing to 1.00.' });
+        return;
+      }
+
       const rawContent = fs.readFileSync(String(row.raw_path), 'utf-8');
       const rawRows = parseDatasetContent(rawContent, row.file_type as DatasetRecord['fileType']);
       const bundle = preprocessAndSplitDataset(rawRows, {
-        trainRatio: Number(req.body?.trainRatio ?? 0.7),
-        valRatio: Number(req.body?.valRatio ?? 0.15),
-        testRatio: Number(req.body?.testRatio ?? 0.15),
+        trainRatio,
+        valRatio,
+        testRatio,
         deduplicate: req.body?.deduplicate !== false,
         dropMissing: req.body?.dropMissing !== false,
-        seed: Number(req.body?.seed ?? 42),
+        seed: Number.isFinite(Number(req.body?.seed)) ? Number(req.body?.seed) : 42,
         columnMapping: req.body?.columnMapping ?? (row.column_mapping_json ? JSON.parse(String(row.column_mapping_json)) : null),
       });
 
@@ -549,7 +568,7 @@ export function createApiRouter() {
     }
   });
 
-  router.get('/datasets/:id/export', (req, res) => {
+  router.get('/datasets/:id/export', async (req, res) => {
     try {
       const id = assertSafeId(req.params.id);
       const row = db.prepare('SELECT * FROM datasets WHERE id = ?').get(id) as Record<string, unknown> | undefined;
@@ -557,18 +576,89 @@ export function createApiRouter() {
         res.status(404).json({ error: 'Dataset not found.' });
         return;
       }
-      if (row.processed_path && fs.existsSync(String(row.processed_path))) {
-        const bundle = JSON.parse(fs.readFileSync(String(row.processed_path), 'utf-8')) as ProcessedDatasetBundle;
-        const jsonl = bundle.cleanedRows.map((r: RawRow) => JSON.stringify(r)).join('\n');
-        res.setHeader('Content-Type', 'application/x-ndjson');
-        res.setHeader('Content-Disposition', `attachment; filename="${id}_cleaned.jsonl"`);
-        res.send(jsonl);
+
+      const splitParam = String(req.query.split ?? 'cleaned').toLowerCase();
+      const formatParam = String(req.query.format ?? 'jsonl').toLowerCase();
+      const validSplits = new Set(['cleaned', 'train', 'val', 'test', 'all']);
+      const validFormats = new Set(['jsonl', 'csv', 'json', 'zip']);
+      const split = validSplits.has(splitParam) ? splitParam : 'cleaned';
+      const format = validFormats.has(formatParam) ? formatParam : 'jsonl';
+
+      const hasProcessed = Boolean(row.processed_path && fs.existsSync(String(row.processed_path)));
+      let bundle: ProcessedDatasetBundle | null = null;
+      if (hasProcessed) {
+        bundle = JSON.parse(fs.readFileSync(String(row.processed_path), 'utf-8')) as ProcessedDatasetBundle;
+      }
+
+      if ((split === 'train' || split === 'val' || split === 'test' || format === 'zip') && !bundle) {
+        res.status(400).json({
+          error: 'Run "Preprocess & Split" first before exporting train/val/test splits or a processed bundle.',
+        });
         return;
       }
-      const raw = fs.readFileSync(String(row.raw_path), 'utf-8');
-      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename="${String(row.file_name)}"`);
-      res.send(raw);
+
+      if (format === 'zip' && bundle) {
+        const zip = new JSZip();
+        const trainRows = bundle.train.map((e) => e.raw);
+        const valRows = bundle.validation.map((e) => e.raw);
+        const testRows = bundle.test.map((e) => e.raw);
+
+        zip.file('cleaned_dataset.jsonl', rowsToJsonl(bundle.cleanedRows));
+        zip.file('cleaned_dataset.csv', rowsToCsv(bundle.cleanedRows));
+        zip.file('splits/train.jsonl', rowsToJsonl(trainRows));
+        zip.file('splits/train.csv', rowsToCsv(trainRows));
+        zip.file('splits/validation.jsonl', rowsToJsonl(valRows));
+        zip.file('splits/validation.csv', rowsToCsv(valRows));
+        zip.file('splits/test.jsonl', rowsToJsonl(testRows));
+        zip.file('splits/test.csv', rowsToCsv(testRows));
+        zip.file('reports/validation_report.json', JSON.stringify(bundle.report, null, 2));
+        zip.file('reports/splits_summary.json', JSON.stringify(bundle.splits, null, 2));
+        zip.file(
+          'README.md',
+          `# ${String(row.name)} — Processed Dataset Bundle\n\n- Format: \`${bundle.format}\`\n- Cleaned Rows: \`${bundle.cleanedRows.length}\`\n- Train Split: \`${trainRows.length}\`\n- Validation Split: \`${valRows.length}\`\n- Test Split: \`${testRows.length}\`\n- Leakage-Free: \`${bundle.splits.leakageFree}\`\n`
+        );
+
+        const buffer = await zip.generateAsync({ type: 'nodebuffer' });
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="${id}_processed_bundle.zip"`);
+        res.send(buffer);
+        return;
+      }
+
+      let targetRows: RawRow[];
+      if (bundle) {
+        if (split === 'train') targetRows = bundle.train.map((e) => e.raw);
+        else if (split === 'val') targetRows = bundle.validation.map((e) => e.raw);
+        else if (split === 'test') targetRows = bundle.test.map((e) => e.raw);
+        else targetRows = bundle.cleanedRows;
+      } else {
+        const raw = fs.readFileSync(String(row.raw_path), 'utf-8');
+        if (!req.query.split && !req.query.format) {
+          res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+          res.setHeader('Content-Disposition', `attachment; filename="${String(row.file_name)}"`);
+          res.send(raw);
+          return;
+        }
+        targetRows = parseDatasetContent(raw, row.file_type as DatasetRecord['fileType']);
+      }
+
+      const fileSuffix = split === 'cleaned' ? 'cleaned' : split;
+      if (format === 'csv') {
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${id}_${fileSuffix}.csv"`);
+        res.send(rowsToCsv(targetRows));
+        return;
+      }
+      if (format === 'json') {
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${id}_${fileSuffix}.json"`);
+        res.send(JSON.stringify(targetRows, null, 2));
+        return;
+      }
+
+      res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${id}_${fileSuffix}.jsonl"`);
+      res.send(rowsToJsonl(targetRows));
     } catch (err) {
       res.status(400).json({ error: (err as Error).message });
     }
@@ -672,6 +762,13 @@ export function createApiRouter() {
   router.post('/models/:id/deploy', (req, res) => {
     try {
       const id = assertSafeId(req.params.id);
+      const existing = db.prepare('SELECT id FROM registered_models WHERE id = ?').get(id) as
+        | { id: string }
+        | undefined;
+      if (!existing) {
+        res.status(404).json({ error: 'Registered model not found.' });
+        return;
+      }
       const status = req.body?.status === 'ready' ? 'ready' : 'deployed';
       db.prepare('UPDATE registered_models SET status = ? WHERE id = ?').run(status, id);
       logAudit('DEPLOY_MODEL', 'registered_model', id, `Updated deployment status to ${status}`);
@@ -740,6 +837,21 @@ export function createApiRouter() {
       const cfg = req.body as TrainingConfig;
       if (!cfg?.experimentName?.trim() || !cfg?.datasetId || !cfg?.modelId) {
         res.status(400).json({ error: 'experimentName, datasetId, and modelId are required.' });
+        return;
+      }
+      assertSafeId(String(cfg.datasetId));
+      if (
+        (cfg.method !== 'full' && (!Number.isFinite(cfg.loraR) || cfg.loraR < 1)) ||
+        !Number.isFinite(cfg.epochs) ||
+        cfg.epochs < 1 ||
+        !Number.isFinite(cfg.batchSize) ||
+        cfg.batchSize < 1 ||
+        !Number.isFinite(cfg.learningRate) ||
+        cfg.learningRate <= 0
+      ) {
+        res.status(400).json({
+          error: 'Training hyperparameters (loraR, epochs, batchSize, learningRate) must be positive finite numbers.',
+        });
         return;
       }
       const exp = startTrainingJob(cfg);
@@ -856,30 +968,46 @@ export function createApiRouter() {
   });
 
   router.post('/training/:id/pause', (req, res) => {
-    const ok = pauseTrainingJob(assertSafeId(req.params.id));
-    res.json({ paused: ok });
+    try {
+      const ok = pauseTrainingJob(assertSafeId(req.params.id));
+      res.json({ paused: ok });
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+    }
   });
 
   router.post('/training/:id/resume', (req, res) => {
-    const ok = resumeTrainingJob(assertSafeId(req.params.id));
-    res.json({ resumed: ok });
+    try {
+      const ok = resumeTrainingJob(assertSafeId(req.params.id));
+      res.json({ resumed: ok });
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+    }
   });
 
   router.post('/training/:id/cancel', (req, res) => {
-    const ok = cancelTrainingJob(assertSafeId(req.params.id));
-    res.json({ cancelled: ok });
+    try {
+      const ok = cancelTrainingJob(assertSafeId(req.params.id));
+      res.json({ cancelled: ok });
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+    }
   });
 
   router.get('/training/:id/logs', (req, res) => {
-    const id = assertSafeId(req.params.id);
-    const logs = getJobLogs(id);
-    if (req.query.download === '1') {
-      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename="${id}.log"`);
-      res.send(logs.join('\n'));
-      return;
+    try {
+      const id = assertSafeId(req.params.id);
+      const logs = getJobLogs(id);
+      if (req.query.download === '1') {
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${id}.log"`);
+        res.send(logs.join('\n'));
+        return;
+      }
+      res.json({ logs });
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
     }
-    res.json({ logs });
   });
 
   // --- EVALUATION & COMPARISON ---
@@ -906,15 +1034,19 @@ export function createApiRouter() {
   });
 
   router.get('/evaluation/:id', (req, res) => {
-    const id = assertSafeId(req.params.id);
-    const row = db
-      .prepare('SELECT * FROM evaluation_runs WHERE id = ?')
-      .get(id) as Record<string, unknown> | undefined;
-    if (!row) {
-      res.status(404).json({ error: 'Evaluation run not found.' });
-      return;
+    try {
+      const id = assertSafeId(req.params.id);
+      const row = db
+        .prepare('SELECT * FROM evaluation_runs WHERE id = ?')
+        .get(id) as Record<string, unknown> | undefined;
+      if (!row) {
+        res.status(404).json({ error: 'Evaluation run not found.' });
+        return;
+      }
+      res.json(mapEvaluationRow(row));
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
     }
-    res.json(mapEvaluationRow(row));
   });
 
   router.post('/comparison/run', (req, res) => {
@@ -990,10 +1122,14 @@ export function createApiRouter() {
     const registered = regRows.map(mapRegisteredModelRow);
     const base = PRETRAINED_MODELS.map((m) => ({
       ref: `base:${m.id}`,
-      label: `${m.name} (Pretrained Base)`,
+      label: m.aiTool && m.aiTool !== 'Open SLM' ? `[${m.aiTool}] ${m.name}` : `${m.name} (Open SLM Base)`,
       method: 'base' as const,
       baseModelId: m.id,
       parameterCount: m.parameterCount,
+      provider: m.provider ?? m.source,
+      aiTool: m.aiTool ?? 'Open SLM',
+      modelTier: m.modelTier ?? 'Edge SLM',
+      trainableLocally: m.trainableLocally ?? true,
     }));
     res.json({
       models: [
@@ -1004,6 +1140,8 @@ export function createApiRouter() {
           baseModelId: r.baseModelId,
           datasetName: r.datasetName,
           status: r.status,
+          aiTool: 'Trained Adapter',
+          provider: 'MiniMind Registry',
         })),
         ...base,
       ],
@@ -1071,9 +1209,13 @@ export function createApiRouter() {
   });
 
   router.delete('/inference/test-reports/:id', (req, res) => {
-    const id = assertSafeId(req.params.id);
-    db.prepare('DELETE FROM playground_reports WHERE id = ?').run(id);
-    res.json({ deleted: true });
+    try {
+      const id = assertSafeId(req.params.id);
+      db.prepare('DELETE FROM playground_reports WHERE id = ?').run(id);
+      res.json({ deleted: true });
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+    }
   });
 
   router.get('/inference/conversations', (_req, res) => {
@@ -1093,42 +1235,45 @@ export function createApiRouter() {
   });
 
   router.post('/inference/conversations', (req, res) => {
-    const id = req.body?.id || `conv_${Date.now().toString(36)}`;
-    const now = new Date().toISOString();
-    const existing = db.prepare('SELECT id FROM playground_conversations WHERE id = ?').get(id);
-    if (existing) {
-      db.prepare(
-        `UPDATE playground_conversations SET model_ref = ?, model_label = ?, system_prompt = ?, messages_json = ?, updated_at = ? WHERE id = ?`
-      ).run(
-        String(req.body.modelRef),
-        String(req.body.modelLabel || req.body.modelRef),
-        String(req.body.systemPrompt || ''),
-        JSON.stringify(req.body.messages || []),
-        now,
-        id
-      );
-    } else {
-      db.prepare(
-        `INSERT INTO playground_conversations (id, workspace_id, model_ref, model_label, system_prompt, messages_json, updated_at, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-      ).run(
-        id,
-        'ws_default',
-        String(req.body.modelRef),
-        String(req.body.modelLabel || req.body.modelRef),
-        String(req.body.systemPrompt || ''),
-        JSON.stringify(req.body.messages || []),
-        now,
-        now
-      );
+    try {
+      const modelRef = String(req.body?.modelRef ?? '').trim();
+      if (!modelRef) {
+        res.status(400).json({ error: 'modelRef is required.' });
+        return;
+      }
+      const id = req.body?.id
+        ? assertSafeId(String(req.body.id))
+        : `conv_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 5)}`;
+      const now = new Date().toISOString();
+      const modelLabel = String(req.body?.modelLabel || modelRef);
+      const systemPrompt = String(req.body?.systemPrompt || '');
+      const messages = Array.isArray(req.body?.messages) ? req.body.messages : [];
+
+      const existing = db.prepare('SELECT id FROM playground_conversations WHERE id = ?').get(id);
+      if (existing) {
+        db.prepare(
+          `UPDATE playground_conversations SET model_ref = ?, model_label = ?, system_prompt = ?, messages_json = ?, updated_at = ? WHERE id = ?`
+        ).run(modelRef, modelLabel, systemPrompt, JSON.stringify(messages), now, id);
+      } else {
+        db.prepare(
+          `INSERT INTO playground_conversations (id, workspace_id, model_ref, model_label, system_prompt, messages_json, updated_at, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        ).run(id, 'ws_default', modelRef, modelLabel, systemPrompt, JSON.stringify(messages), now, now);
+      }
+      res.json({ id, saved: true });
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
     }
-    res.json({ id, saved: true });
   });
 
   router.delete('/inference/conversations/:id', (req, res) => {
-    const id = assertSafeId(req.params.id);
-    db.prepare('DELETE FROM playground_conversations WHERE id = ?').run(id);
-    res.json({ deleted: true });
+    try {
+      const id = assertSafeId(req.params.id);
+      db.prepare('DELETE FROM playground_conversations WHERE id = ?').run(id);
+      res.json({ deleted: true });
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+    }
   });
 
   // --- SETTINGS, WORKSPACE & AUDIT ---
@@ -1190,10 +1335,14 @@ export function createApiRouter() {
   });
 
   router.delete('/settings/api-keys/:id', (req, res) => {
-    const id = assertSafeId(req.params.id);
-    db.prepare('DELETE FROM api_keys WHERE id = ?').run(id);
-    logAudit('REVOKE_API_KEY', 'api_key', id, 'Revoked API token');
-    res.json({ deleted: true });
+    try {
+      const id = assertSafeId(req.params.id);
+      db.prepare('DELETE FROM api_keys WHERE id = ?').run(id);
+      logAudit('REVOKE_API_KEY', 'api_key', id, 'Revoked API token');
+      res.json({ deleted: true });
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+    }
   });
 
   // Ensure artifacts dir stays referenced cleanly

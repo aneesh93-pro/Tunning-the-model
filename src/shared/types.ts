@@ -59,17 +59,38 @@ export interface DatasetRecord {
   updatedAt: string;
 }
 
+export type AiToolCategory =
+  | 'Open SLM'
+  | 'ChatGPT'
+  | 'Claude'
+  | 'Gemini'
+  | 'DeepSeek'
+  | 'Llama'
+  | 'Mistral';
+
 export interface ModelSpec {
   id: string;
   name: string;
   repoId: string;
-  architecture: 'qwen2' | 'llama' | 'phi3';
+  provider?: string;
+  aiTool?: AiToolCategory;
+  modelTier?: 'Edge SLM' | 'Frontier API' | 'Reasoning' | 'Open Weights';
+  trainableLocally?: boolean;
+  architecture: 'qwen2' | 'llama' | 'phi3' | 'gpt4' | 'claude3' | 'gemini' | 'deepseek' | 'mistral';
   parameterCount: string;
   parameterBillions: number;
   contextLength: number;
   defaultPrecision: 'bf16' | 'fp16' | 'nf4';
   license: string;
-  source: 'Hugging Face' | 'Local Cache';
+  source:
+    | 'Hugging Face'
+    | 'Local Cache'
+    | 'OpenAI (ChatGPT)'
+    | 'Anthropic (Claude)'
+    | 'Google (Gemini)'
+    | 'DeepSeek'
+    | 'Meta Open Weights'
+    | 'Mistral AI';
   description: string;
   supportedMethods: ('lora' | 'qlora' | 'full')[];
   targetModules: string[];

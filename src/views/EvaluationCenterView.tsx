@@ -15,18 +15,22 @@ export function EvaluationCenterView() {
   const [error, setError] = useState<string | null>(null);
 
   const loadData = async () => {
-    const [mRes, dsList, evalList] = await Promise.all([
-      api.getInferenceModels(),
-      api.getDatasets(),
-      api.getEvaluations(),
-    ]);
-    setModels(mRes.models);
-    const readyDs = dsList.filter((d) => d.status === 'training_ready');
-    setDatasets(readyDs);
-    setEvaluations(evalList);
-    if (!selectedModelRef && mRes.models.length > 0) setSelectedModelRef(mRes.models[0].ref);
-    if (!selectedDatasetId && readyDs.length > 0) setSelectedDatasetId(readyDs[0].id);
-    if (!activeEval && evalList.length > 0) setActiveEval(evalList[0]);
+    try {
+      const [mRes, dsList, evalList] = await Promise.all([
+        api.getInferenceModels(),
+        api.getDatasets(),
+        api.getEvaluations(),
+      ]);
+      setModels(mRes.models);
+      const readyDs = dsList.filter((d) => d.status === 'training_ready');
+      setDatasets(readyDs);
+      setEvaluations(evalList);
+      if (!selectedModelRef && mRes.models.length > 0) setSelectedModelRef(mRes.models[0].ref);
+      if (!selectedDatasetId && readyDs.length > 0) setSelectedDatasetId(readyDs[0].id);
+      if (!activeEval && evalList.length > 0) setActiveEval(evalList[0]);
+    } catch (err) {
+      setError((err as Error).message);
+    }
   };
 
   useEffect(() => {

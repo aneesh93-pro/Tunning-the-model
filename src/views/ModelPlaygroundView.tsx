@@ -17,6 +17,7 @@ import Markdown from 'react-markdown';
 import { LatticeLoader } from '../components/reactbits/LatticeLoader';
 import { RubberSegment } from '../components/reactbits/RubberSegment';
 import { api } from '../lib/api';
+import { useIsDark } from '../lib/useDarkMode';
 import type {
   DatasetRecord,
   PlaygroundMessage,
@@ -90,8 +91,16 @@ function buildMarkdownReport(report: PlaygroundTestReport): string {
 }
 
 export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProps) {
+  const isDark = useIsDark();
   const [models, setModels] = useState<
-    Array<{ ref: string; label: string; method: string; baseModelId: string }>
+    Array<{
+      ref: string;
+      label: string;
+      method: string;
+      baseModelId: string;
+      aiTool?: string;
+      provider?: string;
+    }>
   >([]);
   const [datasets, setDatasets] = useState<DatasetRecord[]>([]);
   const [selectedRef, setSelectedRef] = useState('');
@@ -152,6 +161,8 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
       } else if (mRes.models.length > 0) {
         setSelectedRef(mRes.models[0].ref);
       }
+    }).catch((err) => {
+      setReportError((err as Error).message);
     });
   }, [initialModelRef]);
 
@@ -186,6 +197,7 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
     let finalConf: number | undefined;
     let finalStructured: StructuredInferenceOutput | undefined;
 
+    let streamHadError = false;
     try {
       const response = await fetch('/api/inference/chat', {
         method: 'POST',
@@ -201,6 +213,17 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
           maxNewTokens,
         }),
       });
+
+      if (!response.ok) {
+        let msg = `Inference request failed (${response.status})`;
+        try {
+          const errJson = (await response.json()) as { error?: string };
+          if (errJson?.error) msg = errJson.error;
+        } catch {
+          // ignore non-JSON body
+        }
+        throw new Error(msg);
+      }
 
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
@@ -270,6 +293,7 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
                 )
               );
             } else if (data.type === 'error') {
+              streamHadError = true;
               finalContent = `Error: ${data.error}`;
               setMessages((prev) =>
                 prev.map((m) => (m.id === assistantId ? { ...m, content: finalContent } : m))
@@ -279,28 +303,30 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
         }
       }
 
-      const modelLabel = models.find((m) => m.ref === selectedRef)?.label || selectedRef;
-      const saved = await api.saveConversation({
-        id: activeConvId,
-        modelRef: selectedRef,
-        modelLabel,
-        systemPrompt,
-        messages: [
-          ...nextHistory,
-          {
-            ...assistantMsg,
-            content: finalContent,
-            latencyMs: finalLatency,
-            tokensGenerated: finalTokens,
-            predictedClass: finalPredClass,
-            confidence: finalConf,
-            structured: finalStructured,
-          },
-        ],
-      });
-      setActiveConvId(saved.id);
-      const updatedConvs = await api.getConversations();
-      setConversations(updatedConvs);
+      if (!streamHadError && finalContent.trim()) {
+        const modelLabel = models.find((m) => m.ref === selectedRef)?.label || selectedRef;
+        const saved = await api.saveConversation({
+          id: activeConvId,
+          modelRef: selectedRef,
+          modelLabel,
+          systemPrompt,
+          messages: [
+            ...nextHistory,
+            {
+              ...assistantMsg,
+              content: finalContent,
+              latencyMs: finalLatency,
+              tokensGenerated: finalTokens,
+              predictedClass: finalPredClass,
+              confidence: finalConf,
+              structured: finalStructured,
+            },
+          ],
+        });
+        setActiveConvId(saved.id);
+        const updatedConvs = await api.getConversations();
+        setConversations(updatedConvs);
+      }
     } catch (err) {
       setMessages((prev) =>
         prev.map((m) =>
@@ -352,8 +378,13 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
 
         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
           <RubberSegment
+            aria-label="Playground view mode"
             value={viewMode}
             size="sm"
+            trackColor={isDark ? '#171B26' : '#E2E8F0'}
+            thumbColor="#2563EB"
+            textColor={isDark ? '#94A3B8' : '#475569'}
+            activeTextColor="#FFFFFF"
             onChange={(val) => setViewMode(val as 'chat' | 'report')}
             items={[
               { value: 'chat', label: 'Structured Chat' },
@@ -406,12 +437,46 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
                 onChange={(e) => setSelectedRef(e.target.value)}
                 className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-white/[0.1] bg-slate-50 dark:bg-[#090B10]"
               >
-                {models.map((m) => (
-                  <option key={m.ref} value={m.ref}>
-                    {m.label}
-                  </option>
-                ))}
+                {(['Trained Adapter', 'ChatGPT', 'Claude', 'Gemini', 'DeepSeek', 'Open SLM', 'Llama', 'Mistral'] as const).map(
+                  (group) => {
+                    const groupItems = models.filter((m) => (m.aiTool ?? 'Open SLM') === group);
+                    if (groupItems.length === 0) return null;
+                    return (
+                      <optgroup key={group} label={group}>
+                        {groupItems.map((m) => (
+                          <option key={m.ref} value={m.ref}>
+                            {m.label}
+                          </option>
+                        ))}
+                      </optgroup>
+                    );
+                  }
+                )}
               </select>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {[
+                  { ref: 'base:gpt-4o', label: 'GPT-4o' },
+                  { ref: 'base:claude-3.7-sonnet', label: 'Claude 3.7 Sonnet' },
+                  { ref: 'base:claude-3-opus', label: 'Claude 3 Opus' },
+                  { ref: 'base:gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+                  { ref: 'base:deepseek-r1', label: 'DeepSeek-R1' },
+                ]
+                  .filter((q) => models.some((m) => m.ref === q.ref))
+                  .map((q) => (
+                    <button
+                      key={q.ref}
+                      type="button"
+                      onClick={() => setSelectedRef(q.ref)}
+                      className={`px-2 py-1 text-[10px] font-medium rounded-md border transition-colors ${
+                        selectedRef === q.ref
+                          ? 'border-blue-500 bg-blue-500/15 text-blue-600 dark:text-blue-400'
+                          : 'border-slate-200 dark:border-white/[0.08] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.04]'
+                      }`}
+                    >
+                      {q.label}
+                    </button>
+                  ))}
+              </div>
             </div>
 
             <div>
@@ -583,9 +648,16 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
                       type="button"
                       aria-label={`Delete conversation ${c.id}`}
                       onClick={() =>
-                        api.deleteConversation(c.id).then(() =>
-                          setConversations((prev) => prev.filter((x) => x.id !== c.id))
-                        )
+                        api
+                          .deleteConversation(c.id)
+                          .then(() => {
+                            setConversations((prev) => prev.filter((x) => x.id !== c.id));
+                            if (activeConvId === c.id) {
+                              setActiveConvId(undefined);
+                              setMessages([]);
+                            }
+                          })
+                          .catch((err) => setReportError((err as Error).message))
                       }
                       className="text-slate-400 hover:text-red-500"
                     >

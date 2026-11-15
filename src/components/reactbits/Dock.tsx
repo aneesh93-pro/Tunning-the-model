@@ -99,10 +99,10 @@ const THEMES: Record<DockTheme, Record<string, string>> = {
     '--dock-panel-shadow':
       '0 22px 44px -22px rgba(15, 23, 42, 0.25), 0 6px 16px -10px rgba(15, 23, 42, 0.14)',
     '--dock-tile': 'linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%)',
-    '--dock-tile-edge': 'rgba(15, 23, 42, 0.09)',
+    '--dock-tile-edge': 'rgba(15, 23, 42, 0.14)',
     '--dock-tile-highlight': 'rgba(255, 255, 255, 1)',
     '--dock-tile-shadow': '0 4px 10px -5px rgba(15, 23, 42, 0.2)',
-    '--dock-ink': '#334155',
+    '--dock-ink': '#1E293B',
     '--dock-label': '#0f172a',
     '--dock-label-ink': '#f8fafc',
     '--dock-dot': '#2563EB',

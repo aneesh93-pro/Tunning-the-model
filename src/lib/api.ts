@@ -58,9 +58,10 @@ export const api = {
       dataset: DatasetRecord;
       previewRows: Record<string, unknown>[];
       processedPreview: {
-        trainSample: unknown[];
-        valSample: unknown[];
-        testSample: unknown[];
+        cleanedSample?: Record<string, unknown>[];
+        trainSample: Record<string, unknown>[];
+        valSample: Record<string, unknown>[];
+        testSample: Record<string, unknown>[];
       } | null;
     }>(`/api/datasets/${id}`),
   uploadDatasetFile: async (file: File, name?: string) => {
@@ -213,6 +214,11 @@ export const api = {
         baseModelId: string;
         datasetName?: string;
         status?: string;
+        parameterCount?: string;
+        provider?: string;
+        aiTool?: string;
+        modelTier?: string;
+        trainableLocally?: boolean;
       }>;
     }>('/api/inference/models'),
   getConversations: () =>

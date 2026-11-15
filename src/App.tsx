@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Activity,
   BarChart3,
@@ -21,6 +21,8 @@ import {
 import { ClickSpark } from './components/reactbits/ClickSpark';
 import Dock, { type DockItemData } from './components/reactbits/Dock';
 import GradientASCII from './components/reactbits/GradientASCII';
+import { SiteFooter } from './components/SiteFooter';
+import { WelcomeIntro } from './components/WelcomeIntro';
 import { api, type OverviewResponse } from './lib/api';
 import { DatasetManagerView } from './views/DatasetManagerView';
 import { EvaluationCenterView } from './views/EvaluationCenterView';
@@ -62,6 +64,8 @@ export default function App() {
   const [activeExperimentId, setActiveExperimentId] = useState<string | null>(null);
   const [playgroundModelRef, setPlaygroundModelRef] = useState<string | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [overviewError, setOverviewError] = useState<string | null>(null);
+  const notificationsRef = useRef<HTMLDivElement>(null);
 
   const loadOverview = async () => {
     setOverviewLoading(true);
@@ -69,6 +73,9 @@ export default function App() {
       const [ov, settings] = await Promise.all([api.getOverview(), api.getSettings()]);
       setOverview(ov);
       setWorkspaceName(settings.workspace.name);
+      setOverviewError(null);
+    } catch (err) {
+      setOverviewError((err as Error).message);
     } finally {
       setOverviewLoading(false);
     }
@@ -77,6 +84,17 @@ export default function App() {
   useEffect(() => {
     void loadOverview();
   }, [section]);
+
+  useEffect(() => {
+    if (!showNotifications) return undefined;
+    const handleOutside = (e: PointerEvent) => {
+      if (notificationsRef.current && !notificationsRef.current.contains(e.target as Node)) {
+        setShowNotifications(false);
+      }
+    };
+    document.addEventListener('pointerdown', handleOutside);
+    return () => document.removeEventListener('pointerdown', handleOutside);
+  }, [showNotifications]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -156,6 +174,7 @@ export default function App() {
       duration={340}
       className="min-h-screen"
     >
+    <WelcomeIntro theme={theme} />
     <div className="min-h-screen flex bg-[#F8FAFC] dark:bg-[#090B10] text-slate-900 dark:text-slate-100 relative overflow-x-clip">
       {/* Global Interactive GradientASCII Horizon Background */}
       <div
@@ -315,10 +334,11 @@ export default function App() {
                 : 'Runtime: CPU LoRA Engine'}
             </span>
 
-            <div className="relative">
+            <div ref={notificationsRef} className="relative">
               <button
                 type="button"
                 aria-label="Toggle notifications"
+                aria-expanded={showNotifications}
                 onClick={() => setShowNotifications((s) => !s)}
                 className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-white/[0.05]"
               >
@@ -332,11 +352,20 @@ export default function App() {
                   ) : (
                     <ul className="divide-y divide-slate-200 dark:divide-white/[0.06] text-xs">
                       {notifications.map((exp) => (
-                        <li key={exp.id} className="py-2">
-                          <div className="font-medium truncate">{exp.name}</div>
-                          <div className="text-[11px] font-mono text-slate-500">
-                            {exp.status} · {exp.modelName}
-                          </div>
+                        <li key={exp.id}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowNotifications(false);
+                              handleNavigate('monitor', exp.id);
+                            }}
+                            className="w-full text-left py-2 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                          >
+                            <div className="font-medium truncate">{exp.name}</div>
+                            <div className="text-[11px] font-mono text-slate-500">
+                              {exp.status} · {exp.modelName}
+                            </div>
+                          </button>
                         </li>
                       ))}
                     </ul>
@@ -367,11 +396,27 @@ export default function App() {
 
         {/* Active Viewport */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1440px] w-full mx-auto">
+          {overviewError && (
+            <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-xs text-red-600 dark:text-red-400">
+              <span>{overviewError}</span>
+              <button
+                type="button"
+                onClick={() => setOverviewError(null)}
+                className="font-medium hover:underline"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
           {section === 'overview' && (
             <OverviewView
               data={overview}
               loading={overviewLoading}
               onNavigate={handleNavigate}
+              onOpenPlayground={(ref) => {
+                setPlaygroundModelRef(ref);
+                handleNavigate('playground');
+              }}
             />
           )}
           {section === 'datasets' && (
@@ -384,6 +429,10 @@ export default function App() {
             <ModelHubView
               selectedModelId={selectedModelId}
               onSelectModel={(id) => setSelectedModelId(id)}
+              onTestInPlayground={(modelId) => {
+                setPlaygroundModelRef(`base:${modelId}`);
+                handleNavigate('playground');
+              }}
               onNavigate={handleNavigate}
             />
           )}
@@ -428,6 +477,8 @@ export default function App() {
             />
           )}
         </main>
+
+        <SiteFooter onNavigate={handleNavigate} />
       </div>
     </div>
     </ClickSpark>

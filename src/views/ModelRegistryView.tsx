@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+  AlertTriangle,
   Download,
   ExternalLink,
   FileText,
@@ -26,12 +27,16 @@ export function ModelRegistryView({
   const [selectedCard, setSelectedCard] = useState<RegisteredModelRecord | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<RegisteredModelRecord | null>(null);
   const [deployModal, setDeployModal] = useState<RegisteredModelRecord | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const loadRegistry = async () => {
     setLoading(true);
     try {
       const list = await api.getRegistryModels();
       setModels(list);
+      setError(null);
+    } catch (err) {
+      setError((err as Error).message);
     } finally {
       setLoading(false);
     }
@@ -43,16 +48,26 @@ export function ModelRegistryView({
 
   const handleToggleDeploy = async (m: RegisteredModelRecord) => {
     const next = m.status === 'deployed' ? 'ready' : 'deployed';
-    const updated = await api.deployModel(m.id, next);
-    setModels((prev) => prev.map((x) => (x.id === m.id ? updated : x)));
-    if (next === 'deployed') setDeployModal(updated);
+    try {
+      const updated = await api.deployModel(m.id, next);
+      setModels((prev) => prev.map((x) => (x.id === m.id ? updated : x)));
+      setError(null);
+      if (next === 'deployed') setDeployModal(updated);
+    } catch (err) {
+      setError((err as Error).message);
+    }
   };
 
   const handleDelete = async () => {
     if (!confirmDelete) return;
-    await api.deleteRegisteredModel(confirmDelete.id);
-    setConfirmDelete(null);
-    await loadRegistry();
+    try {
+      await api.deleteRegisteredModel(confirmDelete.id);
+      setConfirmDelete(null);
+      await loadRegistry();
+    } catch (err) {
+      setError((err as Error).message);
+      setConfirmDelete(null);
+    }
   };
 
   const handleExportModelCard = (m: RegisteredModelRecord) => {
@@ -104,6 +119,13 @@ ${JSON.stringify(m.trainingConfig, null, 2)}
           Train New Adapter
         </button>
       </div>
+
+      {error && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-red-600 dark:text-red-400 flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
 
       {loading ? (
         <div className="p-8 text-xs text-slate-500">Loading registered models...</div>

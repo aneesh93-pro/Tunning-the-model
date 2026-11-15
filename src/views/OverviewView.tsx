@@ -1,9 +1,11 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
   ArrowRight,
   Box,
+  Check,
   Compass,
+  Copy,
   Cpu,
   Database,
   Download,
@@ -11,12 +13,15 @@ import {
   FlaskConical,
   HardDrive,
   Layers,
+  Mail,
   Pause,
   Play,
   RotateCcw,
   SquareTerminal,
   Target,
   Upload,
+  UserCheck,
+  X,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import {
@@ -28,12 +33,11 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { BlurText } from '../components/reactbits/BlurText';
 import { CountUp } from '../components/reactbits/CountUp';
 import { DecryptedText } from '../components/reactbits/DecryptedText';
 import { DitherVeil } from '../components/reactbits/DitherVeil';
 import { DotGrid } from '../components/reactbits/DotGrid';
-import { GlareHover } from '../components/reactbits/GlareHover';
+import GlassIcons, { type GlassIconsItem } from '../components/reactbits/GlassIcons';
 import ModelViewer, {
   type ModelViewerEnvironment,
   type ModelViewerHandle,
@@ -42,11 +46,13 @@ import PaperCrumple, {
   type PaperCrumpleReleaseBehavior,
   type PaperCrumpleState,
 } from '../components/reactbits/PaperCrumple';
+import ProfileCard from '../components/reactbits/ProfileCard';
 import { RubberSegment } from '../components/reactbits/RubberSegment';
 import { ShinyText } from '../components/reactbits/ShinyText';
 import { SpotlightCard } from '../components/reactbits/SpotlightCard';
 import { StarBorder } from '../components/reactbits/StarBorder';
 import { TextLoop } from '../components/reactbits/TextLoop';
+import { TextPressure } from '../components/reactbits/TextPressure';
 import type { OverviewResponse } from '../lib/api';
 import {
   renderMiniMindBriefBackDataUrl,
@@ -72,9 +78,10 @@ interface OverviewViewProps {
   data: OverviewResponse | null;
   loading: boolean;
   onNavigate: (section: NavSection, experimentId?: string) => void;
+  onOpenPlayground?: (modelRef: string) => void;
 }
 
-export function OverviewView({ data, loading, onNavigate }: OverviewViewProps) {
+export function OverviewView({ data, loading, onNavigate, onOpenPlayground }: OverviewViewProps) {
   const isDark = useIsDark();
   const [releaseBehavior, setReleaseBehavior] =
     useState<PaperCrumpleReleaseBehavior>('creased');
@@ -86,6 +93,31 @@ export function OverviewView({ data, loading, onNavigate }: OverviewViewProps) {
     useState<ModelViewerEnvironment>('studio');
   const [iconAutoRotate, setIconAutoRotate] = useState(true);
   const [iconLoaded, setIconLoaded] = useState(false);
+  const [contactOpen, setContactOpen] = useState(false);
+  const [emailCopied, setEmailCopied] = useState(false);
+
+  const engineerEmail = 'aneeshkancharla2007@gmail.com';
+  const engineerPhoto =
+    '/assets/aistudio/BF87E7A0-2FE4-4B72-87E7-0BF358535B01__1__4fc2fed6.jpg';
+
+  useEffect(() => {
+    if (!contactOpen) return undefined;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setContactOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [contactOpen]);
+
+  const handleCopyEmail = async () => {
+    try {
+      await navigator.clipboard.writeText(engineerEmail);
+      setEmailCopied(true);
+      setTimeout(() => setEmailCopied(false), 2200);
+    } catch {
+      setEmailCopied(false);
+    }
+  };
 
   const handleCaptureIcon = () => {
     const dataUrl = modelViewerRef.current?.capture('image/png');
@@ -184,7 +216,7 @@ export function OverviewView({ data, loading, onNavigate }: OverviewViewProps) {
                 />
               </div>
 
-              <div className="pt-1">
+              <div className="pt-1 space-y-2">
                 <p className="text-xs font-medium">
                   <ShinyText
                     text="Custom Small Language Model Studio"
@@ -195,16 +227,28 @@ export function OverviewView({ data, loading, onNavigate }: OverviewViewProps) {
                     shineColor="#93C5FD"
                   />
                 </p>
-                <h1 className="mt-0.5 text-xl sm:text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
-                  <BlurText
-                    text="MiniMind AI Fine-Tuning Console"
-                    trigger="load"
-                    stepDuration={0.22}
-                    delay={40}
+                <div className="w-full overflow-hidden py-1">
+                  <TextPressure
+                    text="MiniMind AI"
+                    flex
+                    alpha={false}
+                    stroke={false}
+                    width
+                    weight
+                    italic
+                    radius={0.55}
+                    smoothing={0.45}
+                    idle="wave"
+                    idleSpeed={1}
+                    clickRipple
+                    textColor={isDark ? '#F8FAFC' : '#0F172A'}
+                    pressureColor={isDark ? '#60A5FA' : '#2563EB'}
+                    minFontSize={26}
+                    maxFontSize={64}
                   />
-                </h1>
-                <p className="mt-1 text-xs sm:text-sm text-slate-600 dark:text-slate-400 max-w-2xl">
-                  Preprocess instruction datasets, train LoRA &amp; 4-bit NF4 QLoRA adapters, run structured boolean/choice/score inference, and benchmark fine-tuned models on held-out test splits.
+                </div>
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 max-w-2xl">
+                  Fine-Tuning Console — preprocess instruction datasets, train LoRA &amp; 4-bit NF4 QLoRA adapters, run structured boolean/choice/score inference, and benchmark fine-tuned models on held-out test splits.
                 </p>
               </div>
             </div>
@@ -288,7 +332,7 @@ export function OverviewView({ data, loading, onNavigate }: OverviewViewProps) {
               </h2>
             </div>
             <p className="mt-3 text-xs sm:text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-              MiniMind AI is a full-stack workspace built for experimenting with and customizing Small Language Models end to end. Begin by uploading and splitting a dataset in <strong className="font-medium text-slate-900 dark:text-slate-100">Dataset Manager</strong>, pick a compact base model (SmolLM2, Qwen2.5, or Phi-3.5) in <strong className="font-medium text-slate-900 dark:text-slate-100">Model Hub</strong>, launch real LoRA or 4-bit NF4 QLoRA fine-tuning in the <strong className="font-medium text-slate-900 dark:text-slate-100">Fine-Tuning Studio</strong>, and inspect grounded predictions in <strong className="font-medium text-slate-900 dark:text-slate-100">Model Playground</strong>.
+              MiniMind AI is a full-stack workspace built for experimenting with Language Models end to end. Begin by uploading, cleaning, and exporting split datasets in <strong className="font-medium text-slate-900 dark:text-slate-100">Dataset Manager</strong>, pick compact open SLMs (SmolLM2, Qwen2.5, Phi-3.5) or test flagship AI models (<strong className="font-medium text-slate-900 dark:text-slate-100">ChatGPT, Claude, Gemini, DeepSeek</strong>) in <strong className="font-medium text-slate-900 dark:text-slate-100">Model Hub</strong> &amp; <strong className="font-medium text-slate-900 dark:text-slate-100">Model Playground</strong>, and launch LoRA / 4-bit NF4 QLoRA fine-tuning in the <strong className="font-medium text-slate-900 dark:text-slate-100">Fine-Tuning Studio</strong>.
             </p>
           </SpotlightCard>
         </motion.div>
@@ -322,6 +366,221 @@ export function OverviewView({ data, loading, onNavigate }: OverviewViewProps) {
           </SpotlightCard>
         </motion.div>
       </div>
+
+      {/* Practical Uses & Example Workflows */}
+      <SpotlightCard
+        spotlightColor={isDark ? 'rgba(59, 130, 246, 0.14)' : 'rgba(37, 99, 235, 0.08)'}
+        className="p-5 sm:p-6"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 shrink-0">
+              <Layers className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                <DecryptedText
+                  text="How to Use MiniMind AI — Practical Example Workflows"
+                  animateOn="inViewHover"
+                  speed={36}
+                  sequential
+                  scrambleColor="#3B82F6"
+                />
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Real end-to-end ways engineers, students, and ML teams use this studio
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => onNavigate('studio')}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+          >
+            Launch Fine-Tuning Studio
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[
+            {
+              step: 'Example 01 · Intent Classification (LoRA)',
+              title: 'Banking Support Triage Adapter',
+              description:
+                'Take the included 24-row Banking Intent Classification dataset, validate & split it into Train/Val/Test in Dataset Manager, and fine-tune Qwen2.5-0.5B with LoRA (r=8).',
+              sample:
+                'Input: "I lost my debit card on the train." → Label: card_lost_or_stolen',
+              cta: 'Open Fine-Tuning Studio',
+              target: 'studio' as NavSection,
+              icon: FlaskConical,
+            },
+            {
+              step: 'Example 02 · Anti-Hallucination Audit',
+              title: 'Structured Boolean / Choice / Score Verification',
+              description:
+                'Test any base model or fine-tuned adapter in Model Playground using deterministic boolean, choice, and score modes to catch fabricated terms (like "JEV AI") and download a full model test report.',
+              sample:
+                'Mode: choice + score → Validates grounded options, flags hallucinations & computes pass rate',
+              cta: 'Run Test in Playground',
+              target: 'playground' as NavSection,
+              icon: SquareTerminal,
+            },
+            {
+              step: 'Example 03 · 4-Bit NF4 QLoRA Chat',
+              title: 'Domain Engineering Assistant on CPU/Low-VRAM',
+              description:
+                'Upload custom conversational JSONL/CSV data (or use SLM Engineering Chat), select 4-bit NF4 QLoRA on SmolLM2 or Phi-3.5, and monitor live step loss, grad norm, and tokens/sec.',
+              sample:
+                'Trains only ~0.5%–2% adapter weights while base parameters stay NF4 quantized',
+              cta: 'Manage Datasets',
+              target: 'datasets' as NavSection,
+              icon: Database,
+            },
+            {
+              step: 'Example 04 · Benchmark & Export',
+              title: 'Compare Base vs. Adapter & Export PEFT Code',
+              description:
+                'Score held-out test splits in Evaluation Center (Accuracy, Macro F1, Perplexity), compare base vs. adapter side by side, and download weights + train_peft.py from Model Registry.',
+              sample:
+                'Outputs confusion matrix, base-vs-tuned delta chart & ready-to-run GPU training script',
+              cta: 'Open Evaluation Center',
+              target: 'evaluation' as NavSection,
+              icon: Activity,
+            },
+          ].map((ex) => (
+            <div
+              key={ex.title}
+              className="rounded-xl border border-slate-200/80 dark:border-white/[0.08] bg-slate-50/75 dark:bg-[#090B10]/70 p-4 flex flex-col justify-between gap-3"
+            >
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-mono font-medium text-blue-600 dark:text-blue-400">
+                    {ex.step}
+                  </span>
+                  <ex.icon className="w-4 h-4 text-slate-400 shrink-0" />
+                </div>
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  {ex.title}
+                </h3>
+                <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                  {ex.description}
+                </p>
+                <div className="rounded-lg border border-slate-200/70 dark:border-white/[0.06] bg-white/80 dark:bg-[#11141C] px-3 py-2 font-mono text-[11px] text-slate-700 dark:text-slate-300">
+                  {ex.sample}
+                </div>
+              </div>
+              <div>
+                <button
+                  type="button"
+                  onClick={() => onNavigate(ex.target)}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  {ex.cta}
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </SpotlightCard>
+
+      {/* AI Engineer Profile Showcase (ReactBits ProfileCard) */}
+      <SpotlightCard
+        spotlightColor={isDark ? 'rgba(59, 130, 246, 0.16)' : 'rgba(37, 99, 235, 0.09)'}
+        className="p-5 sm:p-6"
+      >
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+          <div className="lg:col-span-5 flex justify-center">
+            <ProfileCard
+              name="KANCHARLA ANEESH"
+              title="AI ENGINEER"
+              handle="kancharla.aneesh"
+              status="Online"
+              statusColor="#22c55e"
+              contactText="Contact"
+              avatarUrl={engineerPhoto}
+              miniAvatarUrl={engineerPhoto}
+              photoPosition="center 12%"
+              holo={0.55}
+              glare={0.4}
+              tiltStrength={12}
+              parallax={8}
+              radius={16}
+              enableTilt
+              intro
+              showUserInfo
+              enableMobileTilt
+              theme={isDark ? 'dark' : 'light'}
+              onContactClick={() => setContactOpen(true)}
+            />
+          </div>
+
+          <div className="lg:col-span-7 space-y-5">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 shrink-0">
+                <UserCheck className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  <DecryptedText
+                    text="AI Engineer Profile & Workspace Architect"
+                    animateOn="inViewHover"
+                    speed={36}
+                    sequential
+                    scrambleColor="#3B82F6"
+                  />
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  KANCHARLA ANEESH · AI ENGINEER · Custom SLM Fine-Tuning &amp; Evaluation
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs sm:text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+              Focused on designing parameter-efficient Small Language Model pipelines, deterministic LoRA &amp; 4-bit NF4 QLoRA training workflows, and hallucination-resistant evaluation harnesses with structured <span className="font-mono text-[11px] sm:text-xs text-blue-600 dark:text-blue-400">boolean / choice / score</span> model reporting.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-3 border-t border-slate-200/80 dark:border-white/[0.06] text-xs">
+              <div className="rounded-lg border border-slate-200/80 dark:border-white/[0.07] bg-slate-50/70 dark:bg-[#090B10]/60 p-3.5">
+                <div className="font-medium text-slate-900 dark:text-slate-100">
+                  Core Engineering Stack
+                </div>
+                <p className="mt-1 text-slate-600 dark:text-slate-400 leading-relaxed">
+                  LoRA / QLoRA NF4 quantization, causal SLM training, token-level evaluation, and PEFT export automation.
+                </p>
+              </div>
+              <div className="rounded-lg border border-slate-200/80 dark:border-white/[0.07] bg-slate-50/70 dark:bg-[#090B10]/60 p-3.5">
+                <div className="font-medium text-slate-900 dark:text-slate-100">
+                  Verification &amp; Reliability
+                </div>
+                <p className="mt-1 text-slate-600 dark:text-slate-400 leading-relaxed">
+                  Structured inference testing across SmolLM2, Qwen2.5, and Phi-3.5 adapters with downloadable model reports.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => setContactOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-500 transition-colors whitespace-nowrap"
+              >
+                <Mail className="w-3.5 h-3.5" />
+                Contact AI Engineer
+              </button>
+              <button
+                type="button"
+                onClick={() => onNavigate('playground')}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-white/[0.1] bg-slate-50 dark:bg-white/[0.03] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-colors whitespace-nowrap"
+              >
+                <SquareTerminal className="w-3.5 h-3.5" />
+                Test Models in Playground
+              </button>
+            </div>
+          </div>
+        </div>
+      </SpotlightCard>
 
       {/* 3D MiniMind AI Emblem Showcase (ReactBits ModelViewer) */}
       <SpotlightCard
@@ -577,7 +836,7 @@ export function OverviewView({ data, loading, onNavigate }: OverviewViewProps) {
             <CountUp to={stats?.totalRegisteredModels ?? 0} trigger="load" duration={0.75} separator="," />
           </div>
           <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums">
-            {stats?.totalPretrainedModels ?? 4} base SLMs · {stats?.totalDatasets ?? 0} datasets
+            {stats?.totalPretrainedModels ?? 19} base models · {stats?.totalDatasets ?? 0} datasets
           </p>
         </SpotlightCard>
 
@@ -622,70 +881,90 @@ export function OverviewView({ data, loading, onNavigate }: OverviewViewProps) {
         </SpotlightCard>
       </div>
 
-      {/* Quick Actions Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {[
-          {
-            label: 'Upload Dataset',
-            sub: 'CSV, JSON, JSONL, TXT',
-            icon: Database,
-            target: 'datasets' as NavSection,
-          },
-          {
-            label: 'Select Base Model',
-            sub: 'Qwen2.5, SmolLM2, Phi-3.5',
-            icon: Layers,
-            target: 'models' as NavSection,
-          },
-          {
-            label: 'Configure LoRA / QLoRA',
-            sub: 'Rank, NF4, target modules',
-            icon: FlaskConical,
-            target: 'studio' as NavSection,
-          },
-          {
-            label: 'Open Playground',
-            sub: 'Structured verify & report',
-            icon: SquareTerminal,
-            target: 'playground' as NavSection,
-          },
-        ].map((action) => (
-          <GlareHover
-            key={action.label}
-            width="100%"
-            height="auto"
-            background="transparent"
-            borderColor="transparent"
-            borderRadius="12px"
-            glareColor="#3B82F6"
-            glareOpacity={0.14}
-            variant="streak"
-            mode="hover"
-            rimGlint={false}
-          >
-            <button
-              type="button"
-              onClick={() => onNavigate(action.target)}
-              className="w-full flex items-center justify-between p-4 rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] hover:border-blue-500/40 transition-colors text-left"
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="p-2 rounded-lg bg-slate-100 dark:bg-white/[0.04] text-blue-600 dark:text-blue-400 shrink-0">
-                  <action.icon className="w-4 h-4" />
-                </div>
-                <div className="min-w-0">
-                  <div className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
-                    {action.label}
-                  </div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                    {action.sub}
-                  </div>
-                </div>
-              </div>
-              <ArrowRight className="w-4 h-4 text-slate-400 shrink-0" />
-            </button>
-          </GlareHover>
-        ))}
-      </div>
+      {/* Quick Studio Modules — ReactBits GlassIcons */}
+      <SpotlightCard
+        spotlightColor={isDark ? 'rgba(59, 130, 246, 0.12)' : 'rgba(37, 99, 235, 0.07)'}
+        className="p-5 sm:p-6"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+              Interactive Studio Modules
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Select a workspace module — preprocess &amp; download datasets, test ChatGPT / Claude / Gemini / DeepSeek, or train LoRA adapters
+            </p>
+          </div>
+          <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+            {stats?.totalPretrainedModels ?? 19} models · {stats?.totalDatasets ?? 0} datasets
+          </span>
+        </div>
+
+        <div className="py-2 pb-6">
+          <GlassIcons
+            size={68}
+            gap={52}
+            columns={6}
+            roundness={0.55}
+            refraction={0.75}
+            bevel={0.55}
+            frost={0.22}
+            shine={0.85}
+            tint={isDark ? '#dfdfdf' : '#ffffff'}
+            tintOpacity={isDark ? 0.18 : 0.28}
+            plate="tilt"
+            tilt={26}
+            hover="lift"
+            labels="always"
+            intro={false}
+            theme={isDark ? 'dark' : 'light'}
+            items={[
+              {
+                id: 'datasets',
+                icon: <Database />,
+                color: 'blue',
+                label: 'Dataset Manager',
+                onClick: () => onNavigate('datasets'),
+              },
+              {
+                id: 'models',
+                icon: <Cpu />,
+                color: 'purple',
+                label: 'AI Model Hub',
+                onClick: () => onNavigate('models'),
+              },
+              {
+                id: 'studio',
+                icon: <FlaskConical />,
+                color: 'indigo',
+                label: 'LoRA Studio',
+                onClick: () => onNavigate('studio'),
+              },
+              {
+                id: 'playground',
+                icon: <SquareTerminal />,
+                color: 'teal',
+                label: 'Playground',
+                onClick: () => onNavigate('playground'),
+              },
+              {
+                id: 'evaluation',
+                icon: <Activity />,
+                color: 'orange',
+                label: 'Evaluation',
+                onClick: () => onNavigate('evaluation'),
+              },
+              {
+                id: 'registry',
+                icon: <Layers />,
+                color: 'green',
+                label: 'Model Registry',
+                onClick: () => onNavigate('registry'),
+              },
+            ] satisfies GlassIconsItem[]}
+          />
+        </div>
+      </SpotlightCard>
 
       {/* Charts Row: Training Activity & Model Performance */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -730,7 +1009,10 @@ export function OverviewView({ data, loading, onNavigate }: OverviewViewProps) {
                       borderColor: 'rgba(255,255,255,0.1)',
                       borderRadius: '8px',
                       fontSize: '12px',
+                      color: '#F8FAFC',
                     }}
+                    itemStyle={{ color: '#E2E8F0' }}
+                    labelStyle={{ color: '#94A3B8', marginBottom: '4px' }}
                   />
                   <Bar
                     dataKey="completed"
@@ -793,7 +1075,10 @@ export function OverviewView({ data, loading, onNavigate }: OverviewViewProps) {
                       borderColor: 'rgba(255,255,255,0.1)',
                       borderRadius: '8px',
                       fontSize: '12px',
+                      color: '#F8FAFC',
                     }}
+                    itemStyle={{ color: '#E2E8F0' }}
+                    labelStyle={{ color: '#94A3B8', marginBottom: '4px' }}
                   />
                   <Bar
                     dataKey="score"
@@ -958,7 +1243,11 @@ export function OverviewView({ data, loading, onNavigate }: OverviewViewProps) {
                     </div>
                     <button
                       type="button"
-                      onClick={() => onNavigate('playground')}
+                      onClick={() =>
+                        onOpenPlayground
+                          ? onOpenPlayground(`reg:${m.id}`)
+                          : onNavigate('playground')
+                      }
                       className="text-blue-600 dark:text-blue-400 hover:underline shrink-0"
                     >
                       Test
@@ -970,6 +1259,99 @@ export function OverviewView({ data, loading, onNavigate }: OverviewViewProps) {
           </div>
         </div>
       </div>
+
+      {/* AI Engineer Contact Dialog */}
+      {contactOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="engineer-contact-title"
+          onClick={() => setContactOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-slate-200 dark:border-white/[0.1] bg-white dark:bg-[#11141C] p-6 shadow-2xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <img
+                  src={engineerPhoto}
+                  alt="KANCHARLA ANEESH"
+                  className="w-12 h-12 rounded-full object-cover object-[center_12%] border border-slate-200 dark:border-white/[0.12] shrink-0"
+                />
+                <div className="min-w-0">
+                  <h3
+                    id="engineer-contact-title"
+                    className="text-sm font-semibold text-slate-900 dark:text-slate-50 truncate"
+                  >
+                    KANCHARLA ANEESH
+                  </h3>
+                  <p className="text-xs font-mono text-blue-600 dark:text-blue-400">
+                    AI ENGINEER
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                aria-label="Close contact dialog"
+                onClick={() => setContactOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/[0.06]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 dark:border-white/[0.08] bg-slate-50 dark:bg-[#090B10] p-3.5 space-y-2 text-xs">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-slate-500 dark:text-slate-400">Role</span>
+                <span className="font-mono font-medium text-slate-900 dark:text-slate-100">
+                  AI ENGINEER
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-slate-500 dark:text-slate-400">Handle</span>
+                <span className="font-mono text-slate-800 dark:text-slate-200">
+                  @kancharla.aneesh
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-slate-500 dark:text-slate-400">Email</span>
+                <span className="font-mono text-slate-900 dark:text-slate-100 truncate">
+                  {engineerEmail}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-end gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={handleCopyEmail}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-white/[0.1] bg-slate-50 dark:bg-white/[0.04] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/[0.08]"
+              >
+                {emailCopied ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-500" />
+                    Copied Email
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    Copy Email
+                  </>
+                )}
+              </button>
+              <a
+                href={`mailto:${engineerEmail}?subject=MiniMind%20AI%20Studio`}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-500"
+              >
+                <Mail className="w-3.5 h-3.5" />
+                Send Email
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

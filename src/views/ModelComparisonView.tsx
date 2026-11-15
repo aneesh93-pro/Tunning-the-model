@@ -65,6 +65,8 @@ export function ModelComparisonView() {
       setLeftRef(baseDefault);
       setRightRef(tunedDefault);
       if (ready.length > 0) setDatasetId(ready[0].id);
+    }).catch((err) => {
+      setError((err as Error).message);
     });
   }, []);
 
@@ -241,7 +243,10 @@ export function ModelComparisonView() {
                         borderColor: 'rgba(255,255,255,0.1)',
                         borderRadius: '8px',
                         fontSize: '12px',
+                        color: '#F8FAFC',
                       }}
+                      itemStyle={{ color: '#E2E8F0' }}
+                      labelStyle={{ color: '#94A3B8', marginBottom: '4px' }}
                     />
                     <Legend />
                     <Bar

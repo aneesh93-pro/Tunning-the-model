@@ -7,7 +7,7 @@ import {
   resolveCandidateChoices,
   scoreZeroShotPrompt,
 } from './structuredInference';
-import { PRETRAINED_MODELS } from './modelCatalog';
+import { getModelById, PRETRAINED_MODELS } from './modelCatalog';
 import type { PlaygroundTestCaseResult } from '../shared/types';
 
 test('evaluateStructuredOutput flags out-of-choice hallucinations like JEV AI', () => {
@@ -104,4 +104,31 @@ test('buildPlaygroundTestSuite and aggregatePlaygroundReport compute genuine met
   assert.equal(report.passRate, 1);
   assert.equal(report.hallucinationCount, 0);
   assert.equal(report.verdict, 'pass');
+});
+
+test('expanded AI tool models (ChatGPT, Claude Sonnet/Haiku/Opus, Gemini, DeepSeek) resolve and run structured inference', () => {
+  const requiredIds = [
+    'gpt-4o',
+    'gpt-4o-mini',
+    'claude-3.7-sonnet',
+    'claude-3.5-haiku',
+    'claude-3-opus',
+    'gemini-2.5-pro',
+    'gemini-2.5-flash',
+    'deepseek-v3',
+    'deepseek-r1',
+  ];
+
+  for (const id of requiredIds) {
+    const spec = getModelById(id);
+    assert.ok(spec, `Expected model "${id}" in PRETRAINED_MODELS`);
+    const out = scoreZeroShotPrompt({
+      modelSpec: spec,
+      prompt: 'I lost my debit card on the train and need to freeze it.',
+      choices: ['card_lost_or_stolen', 'internal_transfer', 'balance_inquiry'],
+    });
+    assert.equal(out.choice, 'card_lost_or_stolen');
+    assert.equal(out.booleanValue, true);
+    assert.equal(out.hallucinationFlag, false);
+  }
 });
