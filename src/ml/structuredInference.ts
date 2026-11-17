@@ -1,5 +1,6 @@
 import type {
   ModelSpec,
+  PlaygroundBatchTestSummary,
   PlaygroundTestCaseResult,
   PlaygroundTestReport,
   StructuredInferenceOutput,
@@ -385,5 +386,62 @@ export function aggregatePlaygroundReport(params: {
     verdict,
     cases: params.cases,
     createdAt: new Date().toISOString(),
+  };
+}
+
+export function summarizePlaygroundBatchReports(reports: PlaygroundTestReport[]): {
+  sortedReports: PlaygroundTestReport[];
+  summary: PlaygroundBatchTestSummary;
+} {
+  const sortedReports = [...reports].sort((a, b) => {
+    if (b.passRate !== a.passRate) return b.passRate - a.passRate;
+    if (a.hallucinationRate !== b.hallucinationRate) return a.hallucinationRate - b.hallucinationRate;
+    if (b.avgScore !== a.avgScore) return b.avgScore - a.avgScore;
+    return a.avgLatencyMs - b.avgLatencyMs;
+  });
+
+  const totalModels = sortedReports.length;
+  if (totalModels === 0) {
+    return {
+      sortedReports: [],
+      summary: {
+        totalModels: 0,
+        passedModels: 0,
+        reviewModels: 0,
+        failedModels: 0,
+        avgPassRate: 0,
+        totalHallucinations: 0,
+        avgScore: 0,
+        avgLatencyMs: 0,
+      },
+    };
+  }
+
+  const passedModels = sortedReports.filter((r) => r.verdict === 'pass').length;
+  const reviewModels = sortedReports.filter((r) => r.verdict === 'review').length;
+  const failedModels = sortedReports.filter((r) => r.verdict === 'fail').length;
+  const totalHallucinations = sortedReports.reduce((acc, r) => acc + r.hallucinationCount, 0);
+  const avgPassRate = Number(
+    (sortedReports.reduce((acc, r) => acc + r.passRate, 0) / totalModels).toFixed(4),
+  );
+  const avgScore = Number(
+    (sortedReports.reduce((acc, r) => acc + r.avgScore, 0) / totalModels).toFixed(4),
+  );
+  const avgLatencyMs = Number(
+    (sortedReports.reduce((acc, r) => acc + r.avgLatencyMs, 0) / totalModels).toFixed(2),
+  );
+
+  return {
+    sortedReports,
+    summary: {
+      totalModels,
+      passedModels,
+      reviewModels,
+      failedModels,
+      avgPassRate,
+      totalHallucinations,
+      avgScore,
+      avgLatencyMs,
+    },
   };
 }

@@ -4,6 +4,7 @@ import type {
   ExperimentRecord,
   HardwareTelemetry,
   ModelSpec,
+  PlaygroundBatchTestResponse,
   PlaygroundMessage,
   PlaygroundTestReport,
   RegisteredModelRecord,
@@ -252,6 +253,16 @@ export const api = {
     suiteMode?: PlaygroundTestReport['suiteMode'];
   }) =>
     apiFetch<PlaygroundTestReport>('/api/inference/test-report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }),
+  runPlaygroundTestAllReports: (payload: {
+    modelRefs?: string[];
+    datasetId?: string;
+    suiteMode?: PlaygroundTestReport['suiteMode'];
+  }) =>
+    apiFetch<PlaygroundBatchTestResponse>('/api/inference/test-all', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),

@@ -320,6 +320,22 @@ export interface PlaygroundTestReport {
   createdAt: string;
 }
 
+export interface PlaygroundBatchTestSummary {
+  totalModels: number;
+  passedModels: number;
+  reviewModels: number;
+  failedModels: number;
+  avgPassRate: number;
+  totalHallucinations: number;
+  avgScore: number;
+  avgLatencyMs: number;
+}
+
+export interface PlaygroundBatchTestResponse {
+  reports: PlaygroundTestReport[];
+  summary: PlaygroundBatchTestSummary;
+}
+
 export interface HardwareTelemetry {
   platform: string;
   cpuModel: string;

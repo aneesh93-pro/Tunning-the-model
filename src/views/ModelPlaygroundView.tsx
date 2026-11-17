@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   Check,
@@ -6,7 +6,10 @@ import {
   ClipboardCheck,
   Copy,
   Download,
+  FileSpreadsheet,
   FileText,
+  Layers,
+  MessageSquare,
   Play,
   Send,
   ShieldCheck,
@@ -18,12 +21,25 @@ import { LatticeLoader } from '../components/reactbits/LatticeLoader';
 import { RubberSegment } from '../components/reactbits/RubberSegment';
 import { api } from '../lib/api';
 import { useIsDark } from '../lib/useDarkMode';
+import { summarizePlaygroundBatchReports } from '../ml/structuredInference';
 import type {
   DatasetRecord,
+  PlaygroundBatchTestSummary,
   PlaygroundMessage,
   PlaygroundTestReport,
   StructuredInferenceOutput,
 } from '../shared/types';
+
+const MODEL_GROUPS = [
+  'Trained Adapter',
+  'ChatGPT',
+  'Claude',
+  'Gemini',
+  'DeepSeek',
+  'Open SLM',
+  'Llama',
+  'Mistral',
+] as const;
 
 interface ModelPlaygroundViewProps {
   initialModelRef: string | null;
@@ -90,6 +106,96 @@ function buildMarkdownReport(report: PlaygroundTestReport): string {
   return [...header, ...rows].join('\n');
 }
 
+function buildBatchCsvReport(
+  rows: Array<{
+    rank: number | null;
+    modelLabel: string;
+    modelRef: string;
+    aiTool: string;
+    method: string;
+    report: PlaygroundTestReport | null;
+  }>
+): string {
+  const header = [
+    'Rank',
+    'Model',
+    'ModelRef',
+    'Family',
+    'Method',
+    'Dataset',
+    'SuiteMode',
+    'Verdict',
+    'PassRatePct',
+    'PassedCases',
+    'TotalCases',
+    'Hallucinations',
+    'HallucinationRatePct',
+    'MeanScore',
+    'AvgLatencyMs',
+  ].join(',');
+
+  const escapeCsv = (val: string) => `"${val.replace(/"/g, '""')}"`;
+
+  const lines = rows.map((row) => {
+    const r = row.report;
+    return [
+      row.rank ?? '-',
+      escapeCsv(row.modelLabel),
+      escapeCsv(row.modelRef),
+      escapeCsv(row.aiTool),
+      escapeCsv(row.method),
+      escapeCsv(r?.datasetName ?? 'Not tested'),
+      escapeCsv(r?.suiteMode ?? '-'),
+      escapeCsv(r ? r.verdict.toUpperCase() : 'UNTESTED'),
+      r ? (r.passRate * 100).toFixed(1) : '-',
+      r ? r.passedCount : '-',
+      r ? r.totalCases : '-',
+      r ? r.hallucinationCount : '-',
+      r ? (r.hallucinationRate * 100).toFixed(1) : '-',
+      r ? r.avgScore.toFixed(4) : '-',
+      r ? r.avgLatencyMs.toFixed(2) : '-',
+    ].join(',');
+  });
+
+  return [header, ...lines].join('\n');
+}
+
+function buildBatchMarkdownReport(
+  rows: Array<{
+    rank: number | null;
+    modelLabel: string;
+    modelRef: string;
+    aiTool: string;
+    method: string;
+    report: PlaygroundTestReport | null;
+  }>,
+  summary: PlaygroundBatchTestSummary
+): string {
+  const header = [
+    `# MiniMind AI — All Playground Models Benchmark Report`,
+    ``,
+    `- **Models Tested:** ${summary.totalModels}`,
+    `- **Verdict Breakdown:** ${summary.passedModels} PASS · ${summary.reviewModels} REVIEW · ${summary.failedModels} FAIL`,
+    `- **Mean Pass Rate:** ${(summary.avgPassRate * 100).toFixed(1)}%`,
+    `- **Total Hallucinations Flagged:** ${summary.totalHallucinations}`,
+    `- **Mean Confidence Score:** ${summary.avgScore.toFixed(4)}`,
+    `- **Mean Latency:** ${summary.avgLatencyMs.toFixed(2)} ms`,
+    ``,
+    `| Rank | Model | Family | Verdict | Pass Rate | Hallucinations | Mean Score | Avg Latency |`,
+    `|---:|---|---|---|---:|---:|---:|---:|`,
+  ];
+
+  const lines = rows.map((row) => {
+    const r = row.report;
+    if (!r) {
+      return `| - | ${row.modelLabel} | ${row.aiTool} | UNTESTED | - | - | - | - |`;
+    }
+    return `| ${row.rank ?? '-'} | ${row.modelLabel} | ${row.aiTool} | **${r.verdict.toUpperCase()}** | ${(r.passRate * 100).toFixed(1)}% (${r.passedCount}/${r.totalCases}) | ${r.hallucinationCount} (${(r.hallucinationRate * 100).toFixed(1)}%) | ${r.avgScore.toFixed(4)} | ${r.avgLatencyMs.toFixed(2)} ms |`;
+  });
+
+  return [...header, ...lines].join('\n');
+}
+
 export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProps) {
   const isDark = useIsDark();
   const [models, setModels] = useState<
@@ -107,7 +213,8 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
   const [selectedDatasetId, setSelectedDatasetId] = useState('');
   const [suiteMode, setSuiteMode] =
     useState<PlaygroundTestReport['suiteMode']>('dataset_and_probes');
-  const [viewMode, setViewMode] = useState<'chat' | 'report'>('chat');
+  const [viewMode, setViewMode] = useState<'chat' | 'report' | 'all'>('chat');
+  const [toolFilter, setToolFilter] = useState<string>('All');
 
   const [systemPrompt, setSystemPrompt] = useState(
     'You are a grounded domain-adapted Small Language Model. Return verified boolean, choice, and confidence score without fabricating entities.'
@@ -137,6 +244,8 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
   const [reports, setReports] = useState<PlaygroundTestReport[]>([]);
   const [activeReport, setActiveReport] = useState<PlaygroundTestReport | null>(null);
   const [testingModel, setTestingModel] = useState(false);
+  const [testingAllModels, setTestingAllModels] = useState(false);
+  const [testingRef, setTestingRef] = useState<string | null>(null);
   const [reportError, setReportError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -338,25 +447,110 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
     }
   };
 
-  const handleRunModelReport = async () => {
-    if (!selectedRef || testingModel) return;
+  const handleRunModelReport = async (overrideModelRef?: string, openReportTab = true) => {
+    const targetRef = overrideModelRef ?? selectedRef;
+    if (!targetRef || testingModel || testingAllModels) return;
     setTestingModel(true);
+    setTestingRef(targetRef);
     setReportError(null);
     try {
       const report = await api.runPlaygroundTestReport({
-        modelRef: selectedRef,
+        modelRef: targetRef,
         datasetId: selectedDatasetId || undefined,
         suiteMode,
       });
       setActiveReport(report);
       setReports((prev) => [report, ...prev.filter((r) => r.id !== report.id)]);
-      setViewMode('report');
+      if (openReportTab) {
+        setViewMode('report');
+      }
     } catch (err) {
       setReportError((err as Error).message);
     } finally {
       setTestingModel(false);
+      setTestingRef(null);
     }
   };
+
+  const handleRunAllModelsReport = async () => {
+    if (models.length === 0 || testingAllModels || testingModel) return;
+    setTestingAllModels(true);
+    setReportError(null);
+    try {
+      const result = await api.runPlaygroundTestAllReports({
+        modelRefs: models.map((m) => m.ref),
+        datasetId: selectedDatasetId || undefined,
+        suiteMode,
+      });
+      setReports((prev) => {
+        const incomingIds = new Set(result.reports.map((r) => r.id));
+        return [...result.reports, ...prev.filter((r) => !incomingIds.has(r.id))];
+      });
+      if (result.reports.length > 0) {
+        const matchSelected = result.reports.find((r) => r.modelRef === selectedRef);
+        setActiveReport(matchSelected ?? result.reports[0]);
+      }
+      setViewMode('all');
+    } catch (err) {
+      setReportError((err as Error).message);
+    } finally {
+      setTestingAllModels(false);
+    }
+  };
+
+  const latestReportByModelRef = useMemo(() => {
+    const map = new Map<string, PlaygroundTestReport>();
+    for (const r of reports) {
+      if (!map.has(r.modelRef)) {
+        map.set(r.modelRef, r);
+      }
+    }
+    return map;
+  }, [reports]);
+
+  const { filteredLeaderboardRows, batchSummary } = useMemo(() => {
+    const matchingModels = models.filter(
+      (m) => toolFilter === 'All' || (m.aiTool ?? 'Open SLM') === toolFilter
+    );
+    const testedReports: PlaygroundTestReport[] = [];
+    const modelByRef = new Map(matchingModels.map((m) => [m.ref, m]));
+
+    for (const m of matchingModels) {
+      const rep = latestReportByModelRef.get(m.ref);
+      if (rep) testedReports.push(rep);
+    }
+
+    const { sortedReports, summary } = summarizePlaygroundBatchReports(testedReports);
+    const testedRefs = new Set(sortedReports.map((r) => r.modelRef));
+
+    const rankedRows = sortedReports.map((rep, idx) => {
+      const m = modelByRef.get(rep.modelRef);
+      return {
+        rank: idx + 1,
+        modelRef: rep.modelRef,
+        modelLabel: m?.label ?? rep.modelLabel,
+        aiTool: m?.aiTool ?? 'Open SLM',
+        method: m?.method ?? rep.method,
+        report: rep as PlaygroundTestReport | null,
+      };
+    });
+
+    const untestedRows = matchingModels
+      .filter((m) => !testedRefs.has(m.ref))
+      .map((m) => ({
+        rank: null,
+        modelRef: m.ref,
+        modelLabel: m.label,
+        aiTool: m.aiTool ?? 'Open SLM',
+        method: m.method,
+        report: null as PlaygroundTestReport | null,
+      }));
+
+    return {
+      filteredLeaderboardRows: [...rankedRows, ...untestedRows],
+      batchSummary: summary,
+    };
+  }, [models, toolFilter, latestReportByModelRef]);
 
   const handleCopy = (id: string, content: string) => {
     navigator.clipboard.writeText(content);
@@ -385,20 +579,32 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
             thumbColor="#2563EB"
             textColor={isDark ? '#94A3B8' : '#475569'}
             activeTextColor="#FFFFFF"
-            onChange={(val) => setViewMode(val as 'chat' | 'report')}
+            onChange={(val) => setViewMode(val as 'chat' | 'report' | 'all')}
             items={[
               { value: 'chat', label: 'Structured Chat' },
               { value: 'report', label: `Model Report (${reports.length})` },
+              { value: 'all', label: `All Models (${models.length})` },
             ]}
           />
           <button
             type="button"
-            onClick={handleRunModelReport}
-            disabled={!selectedRef || testingModel}
+            onClick={() => handleRunModelReport()}
+            disabled={!selectedRef || testingModel || testingAllModels}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 whitespace-nowrap"
           >
             <ClipboardCheck className="w-3.5 h-3.5" />
             {testingModel ? 'Testing Model...' : 'Test Model & Generate Report'}
+          </button>
+          <button
+            type="button"
+            onClick={handleRunAllModelsReport}
+            disabled={models.length === 0 || testingAllModels || testingModel}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-50 whitespace-nowrap"
+          >
+            <Layers className="w-3.5 h-3.5" />
+            {testingAllModels
+              ? `Testing All (${models.length})...`
+              : `Test All Models (${models.length})`}
           </button>
           <button
             type="button"
@@ -422,7 +628,7 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Parameters, Diagnostic Runner & Saved Sessions */}
-        <div className="lg:col-span-4 space-y-5">
+        <div className="lg:col-span-4 min-w-0 space-y-5">
           <div className="rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] p-5 space-y-4">
             <h2 className="text-xs font-semibold text-slate-900 dark:text-slate-100">
               Inference &amp; Verification Config
@@ -437,21 +643,19 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
                 onChange={(e) => setSelectedRef(e.target.value)}
                 className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-white/[0.1] bg-slate-50 dark:bg-[#090B10]"
               >
-                {(['Trained Adapter', 'ChatGPT', 'Claude', 'Gemini', 'DeepSeek', 'Open SLM', 'Llama', 'Mistral'] as const).map(
-                  (group) => {
-                    const groupItems = models.filter((m) => (m.aiTool ?? 'Open SLM') === group);
-                    if (groupItems.length === 0) return null;
-                    return (
-                      <optgroup key={group} label={group}>
-                        {groupItems.map((m) => (
-                          <option key={m.ref} value={m.ref}>
-                            {m.label}
-                          </option>
-                        ))}
-                      </optgroup>
-                    );
-                  }
-                )}
+                {MODEL_GROUPS.map((group) => {
+                  const groupItems = models.filter((m) => (m.aiTool ?? 'Open SLM') === group);
+                  if (groupItems.length === 0) return null;
+                  return (
+                    <optgroup key={group} label={group}>
+                      {groupItems.map((m) => (
+                        <option key={m.ref} value={m.ref}>
+                          {m.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  );
+                })}
               </select>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {[
@@ -609,12 +813,23 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
             </div>
             <button
               type="button"
-              onClick={handleRunModelReport}
-              disabled={!selectedRef || testingModel}
+              onClick={() => handleRunModelReport()}
+              disabled={!selectedRef || testingModel || testingAllModels}
               className="w-full inline-flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg border border-blue-500/40 bg-blue-600/10 text-blue-600 dark:text-blue-400 hover:bg-blue-600/20 disabled:opacity-50"
             >
               <Play className="w-3.5 h-3.5" />
               {testingModel ? 'Running Suite...' : 'Run Benchmark & View Report'}
+            </button>
+            <button
+              type="button"
+              onClick={handleRunAllModelsReport}
+              disabled={models.length === 0 || testingAllModels || testingModel}
+              className="w-full inline-flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg border border-emerald-500/40 bg-emerald-600/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-600/20 disabled:opacity-50"
+            >
+              <Layers className="w-3.5 h-3.5" />
+              {testingAllModels
+                ? `Testing All ${models.length} Models...`
+                : `Test Every Model (${models.length})`}
             </button>
           </div>
 
@@ -670,8 +885,8 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
           </div>
         </div>
 
-        {/* Right Panel: Structured Chat OR Diagnostic Model Report */}
-        <div className="lg:col-span-8">
+        {/* Right Panel: Structured Chat OR Diagnostic Model Report OR All Models Matrix */}
+        <div className="lg:col-span-8 min-w-0">
           {viewMode === 'chat' ? (
             <div className="flex flex-col rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] h-[660px]">
               <div className="px-5 py-3 border-b border-slate-200 dark:border-white/[0.08] flex items-center justify-between text-xs">
@@ -826,7 +1041,7 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
                 </button>
               </form>
             </div>
-          ) : (
+          ) : viewMode === 'report' ? (
             <div className="rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] p-5 space-y-5">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-200 dark:border-white/[0.08] pb-4">
                 <div>
@@ -874,7 +1089,7 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
               </div>
 
               {reports.length > 0 && (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 min-w-0">
                   <label className="text-xs text-slate-500 shrink-0">Saved Reports:</label>
                   <select
                     aria-label="Saved Model Reports"
@@ -883,7 +1098,7 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
                       const found = reports.find((r) => r.id === e.target.value);
                       if (found) setActiveReport(found);
                     }}
-                    className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-white/[0.1] bg-slate-50 dark:bg-[#090B10]"
+                    className="flex-1 min-w-0 w-full px-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-white/[0.1] bg-slate-50 dark:bg-[#090B10]"
                   >
                     {reports.map((r) => (
                       <option key={r.id} value={r.id}>
@@ -1031,6 +1246,275 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
                   </div>
                 </>
               )}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] p-5 space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-200 dark:border-white/[0.08] pb-4">
+                <div>
+                  <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    All Playground Models Benchmark Matrix ({models.length} Models)
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Every trained LoRA adapter and base AI model present in Model Playground ranked by pass rate, anti-hallucination grounding, score, and latency.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleRunAllModelsReport}
+                    disabled={models.length === 0 || testingAllModels || testingModel}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-50"
+                  >
+                    <Play className="w-3.5 h-3.5" />
+                    {testingAllModels ? 'Running Sweep...' : 'Run Test All Models'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={filteredLeaderboardRows.length === 0}
+                    onClick={() =>
+                      downloadTextFile(
+                        `minimind-all-models-benchmark-${Date.now()}.csv`,
+                        buildBatchCsvReport(filteredLeaderboardRows),
+                        'text/csv'
+                      )
+                    }
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-white/[0.1] hover:bg-slate-50 dark:hover:bg-white/[0.04] disabled:opacity-50"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5" />
+                    Export CSV
+                  </button>
+                  <button
+                    type="button"
+                    disabled={filteredLeaderboardRows.length === 0}
+                    onClick={() =>
+                      downloadTextFile(
+                        `minimind-all-models-benchmark-${Date.now()}.md`,
+                        buildBatchMarkdownReport(filteredLeaderboardRows, batchSummary),
+                        'text/markdown'
+                      )
+                    }
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-white/[0.1] hover:bg-slate-50 dark:hover:bg-white/[0.04] disabled:opacity-50"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    Export Markdown
+                  </button>
+                </div>
+              </div>
+
+              {/* Aggregate Batch Summary Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono tabular-nums">
+                <div className="rounded-lg border border-slate-200 dark:border-white/[0.08] bg-slate-50 dark:bg-[#090B10] p-3">
+                  <div className="text-[11px] text-slate-500">Models Tested</div>
+                  <div className="mt-1 text-base font-semibold text-slate-900 dark:text-slate-100">
+                    {batchSummary.totalModels}/{filteredLeaderboardRows.length}
+                  </div>
+                  <div className="text-[10px] text-slate-500">
+                    {batchSummary.passedModels} pass · {batchSummary.reviewModels} review · {batchSummary.failedModels} fail
+                  </div>
+                </div>
+                <div className="rounded-lg border border-slate-200 dark:border-white/[0.08] bg-slate-50 dark:bg-[#090B10] p-3">
+                  <div className="text-[11px] text-slate-500">Mean Pass Rate</div>
+                  <div className="mt-1 text-base font-semibold text-slate-900 dark:text-slate-100">
+                    {batchSummary.totalModels > 0 ? `${(batchSummary.avgPassRate * 100).toFixed(1)}%` : '—'}
+                  </div>
+                  <div className="text-[10px] text-slate-500">
+                    Mean score {batchSummary.totalModels > 0 ? batchSummary.avgScore.toFixed(4) : '—'}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-slate-200 dark:border-white/[0.08] bg-slate-50 dark:bg-[#090B10] p-3">
+                  <div className="text-[11px] text-slate-500">Hallucinations Flagged</div>
+                  <div
+                    className={`mt-1 text-base font-semibold ${
+                      batchSummary.totalHallucinations === 0
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : 'text-red-600 dark:text-red-400'
+                    }`}
+                  >
+                    {batchSummary.totalHallucinations}
+                  </div>
+                  <div className="text-[10px] text-slate-500">Across tested suite</div>
+                </div>
+                <div className="rounded-lg border border-slate-200 dark:border-white/[0.08] bg-slate-50 dark:bg-[#090B10] p-3">
+                  <div className="text-[11px] text-slate-500">Mean Latency</div>
+                  <div className="mt-1 text-base font-semibold text-slate-900 dark:text-slate-100">
+                    {batchSummary.totalModels > 0 ? `${batchSummary.avgLatencyMs.toFixed(2)} ms` : '—'}
+                  </div>
+                  <div className="text-[10px] text-slate-500">Per verification case</div>
+                </div>
+              </div>
+
+              {/* AI Tool / Family Filter Bar */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                {(['All', ...MODEL_GROUPS] as const).map((group) => {
+                  const count =
+                    group === 'All'
+                      ? models.length
+                      : models.filter((m) => (m.aiTool ?? 'Open SLM') === group).length;
+                  if (group !== 'All' && count === 0) return null;
+                  const active = toolFilter === group;
+                  return (
+                    <button
+                      key={group}
+                      type="button"
+                      onClick={() => setToolFilter(group)}
+                      className={`px-2.5 py-1 text-[11px] font-medium rounded-md border transition-colors ${
+                        active
+                          ? 'border-blue-500 bg-blue-600 text-white'
+                          : 'border-slate-200 dark:border-white/[0.08] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.04]'
+                      }`}
+                    >
+                      {group} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* All Models Ranked Table */}
+              <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-white/[0.08]">
+                <table className="w-full text-left text-xs">
+                  <thead className="border-b border-slate-200 dark:border-white/[0.08] bg-slate-50 dark:bg-[#090B10] text-slate-500 dark:text-slate-400">
+                    <tr>
+                      <th className="py-2.5 px-2 font-medium w-8">#</th>
+                      <th className="py-2.5 px-2 font-medium">Model</th>
+                      <th className="py-2.5 px-2 font-medium">Family</th>
+                      <th className="py-2.5 px-2 font-medium">Verdict</th>
+                      <th className="py-2.5 px-2 font-medium text-right">Pass Rate</th>
+                      <th className="py-2.5 px-2 font-medium text-right">Halluc.</th>
+                      <th className="py-2.5 px-2 font-medium text-right">Score</th>
+                      <th className="py-2.5 px-2 font-medium text-right">Latency</th>
+                      <th className="py-2.5 px-2 font-medium text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 dark:divide-white/[0.06] font-mono tabular-nums">
+                    {filteredLeaderboardRows.map((row) => {
+                      const r = row.report;
+                      const isRowTesting = testingRef === row.modelRef || testingAllModels;
+                      return (
+                        <tr
+                          key={row.modelRef}
+                          className={`hover:bg-slate-50 dark:hover:bg-white/[0.02] ${
+                            selectedRef === row.modelRef ? 'bg-blue-500/[0.04]' : ''
+                          }`}
+                        >
+                          <td className="py-2 px-2 text-slate-500">
+                            {row.rank !== null ? row.rank : '—'}
+                          </td>
+                          <td className="py-2 px-2 font-sans max-w-[165px]">
+                            <div
+                              className="font-medium text-slate-900 dark:text-slate-100 truncate"
+                              title={row.modelLabel}
+                            >
+                              {row.modelLabel}
+                            </div>
+                            <div className="text-[10px] font-mono text-slate-500 truncate">
+                              {row.method}
+                            </div>
+                          </td>
+                          <td className="py-2 px-2 font-sans text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                            {row.aiTool}
+                          </td>
+                          <td className="py-2 px-2 whitespace-nowrap">
+                            {!r ? (
+                              <span className="text-slate-400">UNTESTED</span>
+                            ) : r.verdict === 'pass' ? (
+                              <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold">
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                PASS
+                              </span>
+                            ) : r.verdict === 'review' ? (
+                              <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 font-semibold">
+                                <AlertTriangle className="w-3.5 h-3.5" />
+                                REVIEW
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-red-600 dark:text-red-400 font-semibold">
+                                <XCircle className="w-3.5 h-3.5" />
+                                FAIL
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2 px-2 text-right whitespace-nowrap">
+                            {r ? (
+                              <span>
+                                {(r.passRate * 100).toFixed(1)}%{' '}
+                                <span className="text-[10px] text-slate-500">
+                                  ({r.passedCount}/{r.totalCases})
+                                </span>
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </td>
+                          <td className="py-2 px-2 text-right whitespace-nowrap">
+                            {r ? (
+                              <span
+                                className={
+                                  r.hallucinationCount === 0
+                                    ? 'text-emerald-600 dark:text-emerald-400'
+                                    : 'text-red-600 dark:text-red-400'
+                                }
+                              >
+                                {r.hallucinationCount} ({(r.hallucinationRate * 100).toFixed(0)}%)
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </td>
+                          <td className="py-2 px-2 text-right">
+                            {r ? r.avgScore.toFixed(4) : <span className="text-slate-400">—</span>}
+                          </td>
+                          <td className="py-2 px-2 text-right whitespace-nowrap">
+                            {r ? (
+                              `${r.avgLatencyMs.toFixed(2)} ms`
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </td>
+                          <td className="py-2 px-2 text-right whitespace-nowrap">
+                            <div className="inline-flex items-center gap-1 font-sans">
+                              {r ? (
+                                <button
+                                  type="button"
+                                  title="View Case-by-Case Report"
+                                  onClick={() => {
+                                    setSelectedRef(row.modelRef);
+                                    setActiveReport(r);
+                                    setViewMode('report');
+                                  }}
+                                  className="px-2 py-1 text-[11px] font-medium rounded border border-blue-500/30 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10"
+                                >
+                                  Report
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  disabled={isRowTesting || testingModel}
+                                  onClick={() => handleRunModelReport(row.modelRef, false)}
+                                  className="px-2 py-1 text-[11px] font-medium rounded border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-50"
+                                >
+                                  {testingRef === row.modelRef ? 'Testing...' : 'Test'}
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedRef(row.modelRef);
+                                  setViewMode('chat');
+                                }}
+                                aria-label={`Chat with ${row.modelLabel}`}
+                                title="Open in Structured Chat"
+                                className="p-1 rounded border border-slate-200 dark:border-white/[0.1] text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/[0.06]"
+                              >
+                                <MessageSquare className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>

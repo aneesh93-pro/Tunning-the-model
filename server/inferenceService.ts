@@ -1,8 +1,9 @@
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { GoogleGenAI, Type } from '@google/genai';
 import { db, logAudit } from './db.ts';
 import { loadTrainedEngineFromAdapter } from './trainingManager.ts';
-import { getModelById } from '../src/ml/modelCatalog.ts';
+import { getModelById, PRETRAINED_MODELS } from '../src/ml/modelCatalog.ts';
 import type { ProcessedDatasetBundle } from '../src/ml/datasetProcessor.ts';
 import {
   aggregatePlaygroundReport,
@@ -13,8 +14,10 @@ import {
   parseCandidateChoices,
   resolveCandidateChoices,
   scoreZeroShotPrompt,
+  summarizePlaygroundBatchReports,
 } from '../src/ml/structuredInference.ts';
 import type {
+  PlaygroundBatchTestResponse,
   PlaygroundTestCaseResult,
   PlaygroundTestReport,
   StructuredInferenceOutput,
@@ -419,7 +422,7 @@ export function runPlaygroundModelDiagnosticReport(params: {
   });
 
   const report = aggregatePlaygroundReport({
-    id: `pgrep_${Date.now().toString(36)}`,
+    id: `pgrep_${Date.now().toString(36)}_${crypto.randomUUID().slice(0, 6)}`,
     modelRef: handle.modelRef,
     modelLabel: handle.modelLabel,
     method: handle.method,
@@ -466,9 +469,55 @@ export function runPlaygroundModelDiagnosticReport(params: {
   return report;
 }
 
+export function listAllPlaygroundModelRefs(): string[] {
+  const regRows = db
+    .prepare('SELECT id FROM registered_models ORDER BY created_at DESC')
+    .all() as Array<{ id: unknown }>;
+  const registeredRefs = regRows.map((row) => `reg:${String(row.id)}`);
+  const baseRefs = PRETRAINED_MODELS.map((m) => `base:${m.id}`);
+  return [...registeredRefs, ...baseRefs];
+}
+
+export function runPlaygroundBatchDiagnosticReports(params: {
+  modelRefs?: string[];
+  datasetId?: string;
+  suiteMode?: PlaygroundTestReport['suiteMode'];
+}): PlaygroundBatchTestResponse {
+  const requestedRefs =
+    params.modelRefs && params.modelRefs.length > 0
+      ? [...new Set(params.modelRefs.map((ref) => String(ref).trim()).filter(Boolean))]
+      : listAllPlaygroundModelRefs();
+
+  if (requestedRefs.length === 0) {
+    throw new Error('No models available to test in Playground.');
+  }
+
+  const generatedReports: PlaygroundTestReport[] = requestedRefs.map((modelRef) =>
+    runPlaygroundModelDiagnosticReport({
+      modelRef,
+      datasetId: params.datasetId,
+      suiteMode: params.suiteMode,
+    })
+  );
+
+  const { sortedReports, summary } = summarizePlaygroundBatchReports(generatedReports);
+
+  logAudit(
+    'PLAYGROUND_BATCH_TEST',
+    'playground_report',
+    'batch_all_models',
+    `Tested all ${summary.totalModels} Playground models (${summary.passedModels} pass, ${summary.reviewModels} review, ${summary.failedModels} fail, mean ${(summary.avgPassRate * 100).toFixed(1)}%)`
+  );
+
+  return {
+    reports: sortedReports,
+    summary,
+  };
+}
+
 export function listPlaygroundTestReports(): PlaygroundTestReport[] {
   const rows = db
-    .prepare('SELECT * FROM playground_reports ORDER BY created_at DESC LIMIT 20')
+    .prepare('SELECT * FROM playground_reports ORDER BY created_at DESC LIMIT 100')
     .all() as Record<string, unknown>[];
   return rows.map((r) => ({
     id: String(r.id),

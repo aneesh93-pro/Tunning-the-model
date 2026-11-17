@@ -6,9 +6,10 @@ import {
   evaluateStructuredOutput,
   resolveCandidateChoices,
   scoreZeroShotPrompt,
+  summarizePlaygroundBatchReports,
 } from './structuredInference';
 import { getModelById, PRETRAINED_MODELS } from './modelCatalog';
-import type { PlaygroundTestCaseResult } from '../shared/types';
+import type { PlaygroundTestCaseResult, PlaygroundTestReport } from '../shared/types';
 
 test('evaluateStructuredOutput flags out-of-choice hallucinations like JEV AI', () => {
   const res = evaluateStructuredOutput({
@@ -131,4 +132,50 @@ test('expanded AI tool models (ChatGPT, Claude Sonnet/Haiku/Opus, Gemini, DeepSe
     assert.equal(out.booleanValue, true);
     assert.equal(out.hallucinationFlag, false);
   }
+});
+
+test('summarizePlaygroundBatchReports ranks models and computes aggregate summary', () => {
+  const mkReport = (
+    id: string,
+    passRate: number,
+    hallucinationCount: number,
+    verdict: PlaygroundTestReport['verdict'],
+    avgScore: number,
+    avgLatencyMs: number,
+  ): PlaygroundTestReport => ({
+    id,
+    modelRef: `base:${id}`,
+    modelLabel: id,
+    method: 'base',
+    datasetId: 'ds_banking_intents',
+    datasetName: 'Banking',
+    suiteMode: 'dataset_and_probes',
+    totalCases: 10,
+    passedCount: Math.round(passRate * 10),
+    passRate,
+    hallucinationCount,
+    hallucinationRate: hallucinationCount / 10,
+    avgScore,
+    avgLatencyMs,
+    verdict,
+    cases: [],
+    createdAt: '2026-11-17T00:00:00.000Z',
+  });
+
+  const { sortedReports, summary } = summarizePlaygroundBatchReports([
+    mkReport('low', 0.4, 2, 'fail', 0.55, 2.0),
+    mkReport('top-fast', 0.9, 0, 'pass', 0.92, 0.8),
+    mkReport('mid', 0.7, 0, 'review', 0.8, 1.2),
+  ]);
+
+  assert.deepEqual(
+    sortedReports.map((r) => r.id),
+    ['top-fast', 'mid', 'low'],
+  );
+  assert.equal(summary.totalModels, 3);
+  assert.equal(summary.passedModels, 1);
+  assert.equal(summary.reviewModels, 1);
+  assert.equal(summary.failedModels, 1);
+  assert.equal(summary.totalHallucinations, 2);
+  assert.equal(summary.avgPassRate, Number(((0.4 + 0.9 + 0.7) / 3).toFixed(4)));
 });

@@ -9,6 +9,7 @@ import { getGpuWorkerHealth } from './gpuWorkerClient.ts';
 import { getHardwareTelemetry } from './hardware.ts';
 import {
   listPlaygroundTestReports,
+  runPlaygroundBatchDiagnosticReports,
   runPlaygroundModelDiagnosticReport,
   streamModelInference,
 } from './inferenceService.ts';
@@ -1209,6 +1210,27 @@ export function createApiRouter() {
         suiteMode,
       });
       res.status(201).json(report);
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+    }
+  });
+
+  router.post('/inference/test-all', (req, res) => {
+    try {
+      const suiteMode = ['dataset_and_probes', 'dataset_only', 'anti_hallucination'].includes(
+        req.body?.suiteMode
+      )
+        ? req.body.suiteMode
+        : 'dataset_and_probes';
+      const modelRefs = Array.isArray(req.body?.modelRefs)
+        ? req.body.modelRefs.map((r: unknown) => String(r))
+        : undefined;
+      const result = runPlaygroundBatchDiagnosticReports({
+        modelRefs,
+        datasetId: req.body?.datasetId ? String(req.body.datasetId) : undefined,
+        suiteMode,
+      });
+      res.status(201).json(result);
     } catch (err) {
       res.status(400).json({ error: (err as Error).message });
     }
