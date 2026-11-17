@@ -210,7 +210,7 @@ vec4 tone(float t) {
 void main() {
   vec2 p = (vUv - 0.5) * vec2(uAspect, 1.0);
   float time = uTime;
-  vec2 q = p / uScale;
+  vec2 q = p / max(uScale, 0.0001);
   vec2 warp = vec2(
     noise(q * 1.6 + uSeed + vec2(0.0, time * 0.3)),
     noise(q * 1.6 + uSeed.yx + vec2(4.3, -time * 0.24))
@@ -231,7 +231,7 @@ void main() {
     vec4 point = uTrail[i];
     if (point.z <= 0.0) continue;
     vec2 d = p - point.xy;
-    scramble = max(scramble, point.z * exp(-dot(d, d) / (uRadius * uRadius)));
+    scramble = max(scramble, point.z * exp(-dot(d, d) / max(uRadius * uRadius, 0.00001)));
   }
   for (int i = 0; i < 4; i++) {
     vec4 c = uClicks[i];

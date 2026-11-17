@@ -8,7 +8,7 @@ export default defineConfig(() => {
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': path.resolve(import.meta.dirname, '.'),
       },
     },
     server: {
@@ -17,6 +17,32 @@ export default defineConfig(() => {
       hmr: process.env.DISABLE_HMR !== 'true',
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
+    },
+    build: {
+      chunkSizeWarningLimit: 800,
+      rolldownOptions: {
+        output: {
+          codeSplitting: {
+            groups: [
+              { name: 'three-core', test: /node_modules[\\/]three[\\/]/, priority: 30 },
+              {
+                name: 'r3f-drei',
+                test: /node_modules[\\/](@react-three|three-stdlib|troika-three-text|camera-controls|maath|meshline)[\\/]/,
+                priority: 25,
+              },
+              { name: 'recharts-vendor', test: /node_modules[\\/]recharts[\\/]/, priority: 20 },
+              { name: 'motion-vendor', test: /node_modules[\\/]motion[\\/]/, priority: 20 },
+              { name: 'jszip-vendor', test: /node_modules[\\/]jszip[\\/]/, priority: 20 },
+              {
+                name: 'markdown-vendor',
+                test: /node_modules[\\/](react-markdown|remark-|rehype-|unified|mdast-|micromark)[\\/]/,
+                priority: 20,
+              },
+              { name: 'react-vendor', test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/, priority: 15 },
+            ],
+          },
+        },
+      },
     },
   };
 });

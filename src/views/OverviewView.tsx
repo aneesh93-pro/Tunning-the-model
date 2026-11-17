@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
   ArrowRight,
@@ -38,14 +38,17 @@ import { DecryptedText } from '../components/reactbits/DecryptedText';
 import { DitherVeil } from '../components/reactbits/DitherVeil';
 import { DotGrid } from '../components/reactbits/DotGrid';
 import GlassIcons, { type GlassIconsItem } from '../components/reactbits/GlassIcons';
-import ModelViewer, {
-  type ModelViewerEnvironment,
-  type ModelViewerHandle,
+import type {
+  ModelViewerEnvironment,
+  ModelViewerHandle,
 } from '../components/reactbits/ModelViewer';
-import PaperCrumple, {
-  type PaperCrumpleReleaseBehavior,
-  type PaperCrumpleState,
+import type {
+  PaperCrumpleReleaseBehavior,
+  PaperCrumpleState,
 } from '../components/reactbits/PaperCrumple';
+
+const ModelViewer = lazy(() => import('../components/reactbits/ModelViewer'));
+const PaperCrumple = lazy(() => import('../components/reactbits/PaperCrumple'));
 import ProfileCard from '../components/reactbits/ProfileCard';
 import { RubberSegment } from '../components/reactbits/RubberSegment';
 import { ShinyText } from '../components/reactbits/ShinyText';
@@ -589,28 +592,36 @@ export function OverviewView({ data, loading, onNavigate, onOpenPlayground }: Ov
       >
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
           <div className="lg:col-span-6 relative rounded-lg border border-slate-200/80 dark:border-white/[0.08] bg-slate-100/70 dark:bg-[#090B10]/85 overflow-hidden">
-            <ModelViewer
-              ref={modelViewerRef}
-              url="/minimind-icon.glb"
-              width="100%"
-              height={390}
-              environment={iconEnvironment}
-              environmentIntensity={isDark ? 1.15 : 1.0}
-              exposure={isDark ? 1.05 : 1.0}
-              intro="rise"
-              autoRotate={iconAutoRotate}
-              autoRotateSpeed={0.55}
-              autoRotateDelay={1.2}
-              dragRotate
-              hoverTilt={0.18}
-              float={0.28}
-              shadow
-              shadowOpacity={isDark ? 0.55 : 0.28}
-              fit={0.8}
-              startAngle={-28}
-              tilt={12}
-              onModelLoaded={() => setIconLoaded(true)}
-            />
+            <Suspense
+              fallback={
+                <div className="h-[390px] w-full flex items-center justify-center text-xs font-mono text-slate-500">
+                  Loading 3D Emblem...
+                </div>
+              }
+            >
+              <ModelViewer
+                ref={modelViewerRef}
+                url="/minimind-icon.glb"
+                width="100%"
+                height={390}
+                environment={iconEnvironment}
+                environmentIntensity={isDark ? 1.15 : 1.0}
+                exposure={isDark ? 1.05 : 1.0}
+                intro="rise"
+                autoRotate={iconAutoRotate}
+                autoRotateSpeed={0.55}
+                autoRotateDelay={1.2}
+                dragRotate
+                hoverTilt={0.18}
+                float={0.28}
+                shadow
+                shadowOpacity={isDark ? 0.55 : 0.28}
+                fit={0.8}
+                startAngle={-28}
+                tilt={12}
+                onModelLoaded={() => setIconLoaded(true)}
+              />
+            </Suspense>
             <div className="pointer-events-none absolute bottom-2.5 right-3 rounded-md bg-black/55 px-2.5 py-1 text-[10px] font-mono text-slate-200 backdrop-blur-sm">
               {iconLoaded ? '3D Emblem · Drag to orbit · Double-click to reset' : 'Loading 3D Emblem...'}
             </div>
@@ -774,32 +785,40 @@ export function OverviewView({ data, loading, onNavigate, onOpenPlayground }: Ov
 
           <div className="lg:col-span-7 relative rounded-lg border border-slate-200/80 dark:border-white/[0.08] bg-slate-100/70 dark:bg-[#090B10]/80 overflow-hidden">
             {briefFrontUrl && (
-              <PaperCrumple
-                src={briefFrontUrl}
-                backSrc={briefBackUrl}
-                alt="MiniMind AI Platform Architecture and Workflow Brief Sheet"
-                width={310}
-                height={392}
-                sceneHeight={430}
-                imageFit="cover"
-                releaseBehavior={releaseBehavior}
-                crumpleAmount={0.85}
-                crumpleDuration={0.55}
-                releaseDuration={0.4}
-                foldCount={6}
-                foldSharpness={0.6}
-                wrinkleDepth={0.65}
-                creaseStrength={0.22}
-                paperColor={isDark ? '#1e2433' : '#f4f0e8'}
-                paperTexture={0.08}
-                lightIntensity={1.8}
-                shadowOpacity={0.1}
-                draggable
-                returnToOrigin
-                detail={48}
-                resetKey={paperResetKey}
-                onStateChange={setPaperState}
-              />
+              <Suspense
+                fallback={
+                  <div className="h-[430px] w-full flex items-center justify-center text-xs font-mono text-slate-500">
+                    Loading Interactive Brief Sheet...
+                  </div>
+                }
+              >
+                <PaperCrumple
+                  src={briefFrontUrl}
+                  backSrc={briefBackUrl}
+                  alt="MiniMind AI Platform Architecture and Workflow Brief Sheet"
+                  width={310}
+                  height={392}
+                  sceneHeight={430}
+                  imageFit="cover"
+                  releaseBehavior={releaseBehavior}
+                  crumpleAmount={0.85}
+                  crumpleDuration={0.55}
+                  releaseDuration={0.4}
+                  foldCount={6}
+                  foldSharpness={0.6}
+                  wrinkleDepth={0.65}
+                  creaseStrength={0.22}
+                  paperColor={isDark ? '#1e2433' : '#f4f0e8'}
+                  paperTexture={0.08}
+                  lightIntensity={1.8}
+                  shadowOpacity={0.1}
+                  draggable
+                  returnToOrigin
+                  detail={48}
+                  resetKey={paperResetKey}
+                  onStateChange={setPaperState}
+                />
+              </Suspense>
             )}
             <div className="pointer-events-none absolute bottom-2.5 right-3 rounded-md bg-black/55 px-2.5 py-1 text-[10px] font-mono text-slate-200 backdrop-blur-sm">
               Hold &amp; drag sheet · 3D Paper Physics

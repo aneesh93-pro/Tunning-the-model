@@ -1,3 +1,4 @@
+import './suppressSqliteWarning.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -7,9 +8,18 @@ import {
   validateDatasetRows,
 } from '../src/ml/datasetProcessor.ts';
 
-export const DATA_DIR = path.resolve(process.cwd(), 'data');
+const IS_VERCEL = Boolean(process.env.VERCEL);
+export const DATA_DIR = process.env.DATA_DIR
+  ? path.resolve(process.env.DATA_DIR)
+  : IS_VERCEL
+    ? '/tmp/minimind-data'
+    : path.resolve(process.cwd(), 'data');
 export const DATASETS_DIR = path.join(DATA_DIR, 'datasets');
-export const ARTIFACTS_DIR = path.resolve(process.cwd(), 'artifacts');
+export const ARTIFACTS_DIR = process.env.ARTIFACTS_DIR
+  ? path.resolve(process.env.ARTIFACTS_DIR)
+  : IS_VERCEL
+    ? '/tmp/minimind-artifacts'
+    : path.resolve(process.cwd(), 'artifacts');
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 fs.mkdirSync(DATASETS_DIR, { recursive: true });

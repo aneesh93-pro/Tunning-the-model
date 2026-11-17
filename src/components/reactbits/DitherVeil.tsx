@@ -332,7 +332,8 @@ float shockwave(vec2 p) {
     vec4 burst = uBursts[i];
     if (burst.w <= 0.0) continue;
     float offset = distance(p, burst.xy) - burst.z;
-    float edge = offset > 0.0 ? offset / (uBurstWidth * 0.35) : -offset / uBurstWidth;
+    float bw = max(uBurstWidth, 0.0001);
+    float edge = offset > 0.0 ? offset / (bw * 0.35) : -offset / bw;
     value = max(value, clamp(1.0 - edge, 0.0, 1.0) * burst.w);
   }
   return value;

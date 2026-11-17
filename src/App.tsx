@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import {
   Activity,
   BarChart3,
@@ -24,17 +24,38 @@ import GradientASCII from './components/reactbits/GradientASCII';
 import { SiteFooter } from './components/SiteFooter';
 import { WelcomeIntro } from './components/WelcomeIntro';
 import { api, type OverviewResponse } from './lib/api';
-import { DatasetManagerView } from './views/DatasetManagerView';
-import { EvaluationCenterView } from './views/EvaluationCenterView';
-import { ExperimentHistoryView } from './views/ExperimentHistoryView';
-import { FineTuningStudioView } from './views/FineTuningStudioView';
-import { ModelComparisonView } from './views/ModelComparisonView';
-import { ModelHubView } from './views/ModelHubView';
-import { ModelPlaygroundView } from './views/ModelPlaygroundView';
-import { ModelRegistryView } from './views/ModelRegistryView';
 import { OverviewView, type NavSection } from './views/OverviewView';
-import { SettingsView } from './views/SettingsView';
-import { TrainingMonitorView } from './views/TrainingMonitorView';
+
+const DatasetManagerView = lazy(() =>
+  import('./views/DatasetManagerView').then((m) => ({ default: m.DatasetManagerView })),
+);
+const EvaluationCenterView = lazy(() =>
+  import('./views/EvaluationCenterView').then((m) => ({ default: m.EvaluationCenterView })),
+);
+const ExperimentHistoryView = lazy(() =>
+  import('./views/ExperimentHistoryView').then((m) => ({ default: m.ExperimentHistoryView })),
+);
+const FineTuningStudioView = lazy(() =>
+  import('./views/FineTuningStudioView').then((m) => ({ default: m.FineTuningStudioView })),
+);
+const ModelComparisonView = lazy(() =>
+  import('./views/ModelComparisonView').then((m) => ({ default: m.ModelComparisonView })),
+);
+const ModelHubView = lazy(() =>
+  import('./views/ModelHubView').then((m) => ({ default: m.ModelHubView })),
+);
+const ModelPlaygroundView = lazy(() =>
+  import('./views/ModelPlaygroundView').then((m) => ({ default: m.ModelPlaygroundView })),
+);
+const ModelRegistryView = lazy(() =>
+  import('./views/ModelRegistryView').then((m) => ({ default: m.ModelRegistryView })),
+);
+const SettingsView = lazy(() =>
+  import('./views/SettingsView').then((m) => ({ default: m.SettingsView })),
+);
+const TrainingMonitorView = lazy(() =>
+  import('./views/TrainingMonitorView').then((m) => ({ default: m.TrainingMonitorView })),
+);
 
 const NAV_ITEMS: Array<{ id: NavSection; label: string; icon: typeof LayoutDashboard }> = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
@@ -408,74 +429,82 @@ export default function App() {
               </button>
             </div>
           )}
-          {section === 'overview' && (
-            <OverviewView
-              data={overview}
-              loading={overviewLoading}
-              onNavigate={handleNavigate}
-              onOpenPlayground={(ref) => {
-                setPlaygroundModelRef(ref);
-                handleNavigate('playground');
-              }}
-            />
-          )}
-          {section === 'datasets' && (
-            <DatasetManagerView
-              onSelectForTraining={(id) => setSelectedDatasetId(id)}
-              onNavigate={handleNavigate}
-            />
-          )}
-          {section === 'models' && (
-            <ModelHubView
-              selectedModelId={selectedModelId}
-              onSelectModel={(id) => setSelectedModelId(id)}
-              onTestInPlayground={(modelId) => {
-                setPlaygroundModelRef(`base:${modelId}`);
-                handleNavigate('playground');
-              }}
-              onNavigate={handleNavigate}
-            />
-          )}
-          {section === 'studio' && (
-            <FineTuningStudioView
-              initialDatasetId={selectedDatasetId}
-              initialModelId={selectedModelId}
-              onTrainingStarted={(expId) => handleNavigate('monitor', expId)}
-              onNavigate={handleNavigate}
-            />
-          )}
-          {section === 'monitor' && (
-            <TrainingMonitorView
-              activeExperimentId={activeExperimentId}
-              onSelectExperiment={(id) => setActiveExperimentId(id)}
-            />
-          )}
-          {section === 'playground' && (
-            <ModelPlaygroundView initialModelRef={playgroundModelRef} />
-          )}
-          {section === 'evaluation' && <EvaluationCenterView />}
-          {section === 'comparison' && <ModelComparisonView />}
-          {section === 'registry' && (
-            <ModelRegistryView
-              onOpenPlayground={(ref) => {
-                setPlaygroundModelRef(ref);
-                handleNavigate('playground');
-              }}
-              onNavigate={handleNavigate}
-            />
-          )}
-          {section === 'history' && (
-            <ExperimentHistoryView
-              onOpenMonitor={(id) => handleNavigate('monitor', id)}
-            />
-          )}
-          {section === 'settings' && (
-            <SettingsView
-              theme={theme}
-              onToggleTheme={setTheme}
-              onWorkspaceUpdated={loadOverview}
-            />
-          )}
+          <Suspense
+            fallback={
+              <div className="rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white/70 dark:bg-[#11141C]/70 p-8 text-xs font-mono text-slate-500 dark:text-slate-400">
+                Loading workspace module...
+              </div>
+            }
+          >
+            {section === 'overview' && (
+              <OverviewView
+                data={overview}
+                loading={overviewLoading}
+                onNavigate={handleNavigate}
+                onOpenPlayground={(ref) => {
+                  setPlaygroundModelRef(ref);
+                  handleNavigate('playground');
+                }}
+              />
+            )}
+            {section === 'datasets' && (
+              <DatasetManagerView
+                onSelectForTraining={(id) => setSelectedDatasetId(id)}
+                onNavigate={handleNavigate}
+              />
+            )}
+            {section === 'models' && (
+              <ModelHubView
+                selectedModelId={selectedModelId}
+                onSelectModel={(id) => setSelectedModelId(id)}
+                onTestInPlayground={(modelId) => {
+                  setPlaygroundModelRef(`base:${modelId}`);
+                  handleNavigate('playground');
+                }}
+                onNavigate={handleNavigate}
+              />
+            )}
+            {section === 'studio' && (
+              <FineTuningStudioView
+                initialDatasetId={selectedDatasetId}
+                initialModelId={selectedModelId}
+                onTrainingStarted={(expId) => handleNavigate('monitor', expId)}
+                onNavigate={handleNavigate}
+              />
+            )}
+            {section === 'monitor' && (
+              <TrainingMonitorView
+                activeExperimentId={activeExperimentId}
+                onSelectExperiment={(id) => setActiveExperimentId(id)}
+              />
+            )}
+            {section === 'playground' && (
+              <ModelPlaygroundView initialModelRef={playgroundModelRef} />
+            )}
+            {section === 'evaluation' && <EvaluationCenterView />}
+            {section === 'comparison' && <ModelComparisonView />}
+            {section === 'registry' && (
+              <ModelRegistryView
+                onOpenPlayground={(ref) => {
+                  setPlaygroundModelRef(ref);
+                  handleNavigate('playground');
+                }}
+                onNavigate={handleNavigate}
+              />
+            )}
+            {section === 'history' && (
+              <ExperimentHistoryView
+                onOpenMonitor={(id) => handleNavigate('monitor', id)}
+              />
+            )}
+            {section === 'settings' && (
+              <SettingsView
+                theme={theme}
+                onToggleTheme={setTheme}
+                onWorkspaceUpdated={loadOverview}
+              />
+            )}
+          </Suspense>
         </main>
 
         <SiteFooter onNavigate={handleNavigate} />

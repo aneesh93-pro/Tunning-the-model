@@ -5,6 +5,7 @@ import express, { type Request, type Response } from 'express';
 import JSZip from 'jszip';
 import multer from 'multer';
 import { ARTIFACTS_DIR, DATASETS_DIR, db, logAudit } from './db.ts';
+import { getGpuWorkerHealth } from './gpuWorkerClient.ts';
 import { getHardwareTelemetry } from './hardware.ts';
 import {
   listPlaygroundTestReports,
@@ -303,6 +304,15 @@ function evaluateModelAgainstTestSet(modelRef: string, datasetId: string): Evalu
 export function createApiRouter() {
   const router = express.Router();
   router.use(rateLimit);
+
+  router.get('/health', async (_req, res) => {
+    const gpuWorker = await getGpuWorkerHealth();
+    res.json({
+      status: 'ok',
+      service: 'api',
+      gpuWorker,
+    });
+  });
 
   // --- OVERVIEW & HARDWARE ---
   router.get('/overview', (_req, res) => {
@@ -1277,7 +1287,7 @@ export function createApiRouter() {
   });
 
   // --- SETTINGS, WORKSPACE & AUDIT ---
-  router.get('/settings', (_req, res) => {
+  router.get('/settings', async (_req, res) => {
     const workspace = db.prepare('SELECT * FROM workspaces WHERE id = ?').get('ws_default');
     const users = db.prepare('SELECT * FROM users WHERE workspace_id = ?').all('ws_default');
     const apiKeys = db
@@ -1286,6 +1296,7 @@ export function createApiRouter() {
     const auditLogs = db
       .prepare('SELECT * FROM audit_logs ORDER BY id DESC LIMIT 30')
       .all();
+    const gpuWorker = await getGpuWorkerHealth();
 
     res.json({
       workspace,
@@ -1293,6 +1304,7 @@ export function createApiRouter() {
       apiKeys,
       auditLogs,
       hardware: getHardwareTelemetry(),
+      gpuWorker,
       geminiConfigured: Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'MY_GEMINI_API_KEY'),
     });
   });

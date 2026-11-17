@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import * as THREE from 'three';
+import { applyThreeShaderSafetyFixes } from '../../utils/threeShaderFixes';
+
+applyThreeShaderSafetyFixes();
 
 export type PaperCrumpleState = 'holding' | 'flat' | 'crumpled' | 'creased';
 export type PaperCrumpleReleaseBehavior = 'stay' | 'restore' | 'creased';
