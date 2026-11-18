@@ -1,12 +1,19 @@
-import './suppressSqliteWarning.ts';
+import { createRequire } from 'node:module';
+import type { DatabaseSync as DatabaseSyncType } from 'node:sqlite';
 import fs from 'node:fs';
 import path from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
+import { installSqliteWarningFilter } from './suppressSqliteWarning.ts';
 import {
   parseDatasetContent,
   preprocessAndSplitDataset,
   validateDatasetRows,
 } from '../src/ml/datasetProcessor.ts';
+
+installSqliteWarningFilter();
+const require = createRequire(import.meta.url);
+const { DatabaseSync } = require('node:sqlite') as {
+  DatabaseSync: typeof DatabaseSyncType;
+};
 
 const IS_VERCEL = Boolean(process.env.VERCEL);
 export const DATA_DIR = process.env.DATA_DIR
@@ -25,7 +32,7 @@ fs.mkdirSync(DATA_DIR, { recursive: true });
 fs.mkdirSync(DATASETS_DIR, { recursive: true });
 fs.mkdirSync(ARTIFACTS_DIR, { recursive: true });
 
-export const db = new DatabaseSync(path.join(DATA_DIR, 'minimind.db'));
+export const db: DatabaseSyncType = new DatabaseSync(path.join(DATA_DIR, 'minimind.db'));
 db.exec('PRAGMA journal_mode = WAL;');
 db.exec('PRAGMA foreign_keys = ON;');
 

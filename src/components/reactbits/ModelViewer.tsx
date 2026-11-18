@@ -1,4 +1,5 @@
 import {
+  Component,
   Suspense,
   useCallback,
   useEffect,
@@ -11,9 +12,15 @@ import {
   type Ref,
 } from 'react';
 import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber';
-import { ContactShadows, Environment, Lightformer, useFBX, useGLTF } from '@react-three/drei';
+import { ContactShadows, Environment, Lightformer, useFBX } from '@react-three/drei';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import * as THREE from 'three';
+import {
+  buildMiniMindEmblemGroup,
+  disposeObject3DResources,
+  isValidGlbOrGltfBuffer,
+} from '../../utils/minimindEmblem';
 import { applyThreeShaderSafetyFixes } from '../../utils/threeShaderFixes';
 
 applyThreeShaderSafetyFixes();
@@ -182,15 +189,112 @@ const ENV_PALETTES: Record<
   forest: { top: '#dcfce7', key: '#a7f3d0', fill: '#38bdf8', rim: '#818cf8' },
 };
 
-const GltfModel = ({
+const FallbackEmblemModel = ({
+  children,
+}: {
+  children: (obj: THREE.Object3D) => ReactNode;
+}) => {
+  const object = useMemo(() => buildMiniMindEmblemGroup(), []);
+  useEffect(() => () => disposeObject3DResources(object), [object]);
+  return <>{children(object)}</>;
+};
+
+class ModelSceneErrorBoundary extends Component<
+  { fallback: ReactNode; children: ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError(): { hasError: boolean } {
+    return { hasError: true };
+  }
+
+  componentDidCatch() {
+    // Fallback renders procedural MiniMind 3D Emblem cleanly
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback;
+    }
+    return this.props.children;
+  }
+}
+
+const SafeGltfModel = ({
   url,
   children,
 }: {
   url: string;
   children: (obj: THREE.Object3D) => ReactNode;
 }) => {
-  const { scene } = useGLTF(url);
-  const object = useMemo(() => scene.clone(true), [scene]);
+  const [object, setObject] = useState<THREE.Object3D | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
+    let loadedObj: THREE.Object3D | null = null;
+
+    const useFallback = () => {
+      if (!active) return;
+      const fallback = buildMiniMindEmblemGroup();
+      loadedObj = fallback;
+      setObject(fallback);
+    };
+
+    const loadValidatedGlb = async () => {
+      try {
+        const res = await fetch(url, { signal: controller.signal });
+        if (!res.ok) {
+          useFallback();
+          return;
+        }
+        const contentType = (res.headers.get('content-type') || '').toLowerCase();
+        if (contentType.includes('text/html')) {
+          useFallback();
+          return;
+        }
+        const buffer = await res.arrayBuffer();
+        if (!active) return;
+        const validation = isValidGlbOrGltfBuffer(buffer);
+        if (!validation.valid) {
+          useFallback();
+          return;
+        }
+
+        const loader = new GLTFLoader();
+        const basePath = url.slice(0, url.lastIndexOf('/') + 1);
+        loader.parse(
+          buffer,
+          basePath,
+          (gltf) => {
+            if (!active) return;
+            const cloned = gltf.scene.clone(true);
+            loadedObj = cloned;
+            setObject(cloned);
+          },
+          () => {
+            useFallback();
+          }
+        );
+      } catch (err) {
+        if ((err as Error)?.name === 'AbortError') return;
+        useFallback();
+      }
+    };
+
+    void loadValidatedGlb();
+
+    return () => {
+      active = false;
+      controller.abort();
+      if (loadedObj) {
+        disposeObject3DResources(loadedObj);
+      }
+    };
+  }, [url]);
+
+  if (!object) return null;
   return <>{children(object)}</>;
 };
 
@@ -228,7 +332,7 @@ const Model = ({
   const extension = url.split('?')[0].split('.').pop()?.toLowerCase() ?? '';
   if (extension === 'fbx') return <FbxModel url={url}>{children}</FbxModel>;
   if (extension === 'obj') return <ObjModel url={url}>{children}</ObjModel>;
-  return <GltfModel url={url}>{children}</GltfModel>;
+  return <SafeGltfModel url={url}>{children}</SafeGltfModel>;
 };
 
 const Exposure = ({ value }: { value: number }) => {
@@ -723,16 +827,31 @@ export const ModelViewer = ({
         <Lighting environment={environment} intensity={environmentIntensity} />
         <Suspense fallback={null}>
           {url && (
-            <Model url={url}>
-              {(object) => (
-                <Stage
-                  object={object}
-                  settingsRef={settingsRef}
-                  visibleRef={visibleRef}
-                  onReady={handleReady}
-                />
-              )}
-            </Model>
+            <ModelSceneErrorBoundary
+              fallback={
+                <FallbackEmblemModel>
+                  {(object) => (
+                    <Stage
+                      object={object}
+                      settingsRef={settingsRef}
+                      visibleRef={visibleRef}
+                      onReady={handleReady}
+                    />
+                  )}
+                </FallbackEmblemModel>
+              }
+            >
+              <Model url={url}>
+                {(object) => (
+                  <Stage
+                    object={object}
+                    settingsRef={settingsRef}
+                    visibleRef={visibleRef}
+                    onReady={handleReady}
+                  />
+                )}
+              </Model>
+            </ModelSceneErrorBoundary>
           )}
         </Suspense>
       </Canvas>
