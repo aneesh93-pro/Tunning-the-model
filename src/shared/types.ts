@@ -39,7 +39,7 @@ export interface DatasetRecord {
   id: string;
   name: string;
   fileName: string;
-  fileType: 'csv' | 'json' | 'jsonl' | 'txt';
+  fileType: 'csv' | 'json' | 'jsonl' | 'txt' | 'tsv' | 'ndjson';
   format: DatasetFormat;
   status: 'uploaded' | 'validated' | 'training_ready';
   rowCount: number;
@@ -61,6 +61,8 @@ export interface DatasetRecord {
 
 export type AiToolCategory =
   | 'Open SLM'
+  | 'NVIDIA NIM'
+  | 'Z.ai'
   | 'ChatGPT'
   | 'Claude'
   | 'Gemini'
@@ -76,7 +78,17 @@ export interface ModelSpec {
   aiTool?: AiToolCategory;
   modelTier?: 'Edge SLM' | 'Frontier API' | 'Reasoning' | 'Open Weights';
   trainableLocally?: boolean;
-  architecture: 'qwen2' | 'llama' | 'phi3' | 'gpt4' | 'claude3' | 'gemini' | 'deepseek' | 'mistral';
+  architecture:
+    | 'qwen2'
+    | 'llama'
+    | 'phi3'
+    | 'gpt4'
+    | 'claude3'
+    | 'gemini'
+    | 'deepseek'
+    | 'mistral'
+    | 'nemotron'
+    | 'glm';
   parameterCount: string;
   parameterBillions: number;
   contextLength: number;
@@ -85,6 +97,8 @@ export interface ModelSpec {
   source:
     | 'Hugging Face'
     | 'Local Cache'
+    | 'NVIDIA NIM'
+    | 'Z.ai'
     | 'OpenAI (ChatGPT)'
     | 'Anthropic (Claude)'
     | 'Google (Gemini)'
@@ -100,6 +114,18 @@ export interface ModelSpec {
   estimatedFp16MemoryGb: number;
   estimatedQloraMemoryGb: number;
   chatTemplate: 'chatml' | 'phi3';
+}
+
+export interface ComparisonModelMeta {
+  durationMs: number;
+  adapterSizeBytes: number;
+  trainableParams: number;
+  totalParams: number;
+  estimatedMemoryGb: number;
+  precision: string;
+  architecture: string;
+  contextLength: number;
+  parameterCountLabel: string;
 }
 
 export type TrainingMethod = 'lora' | 'qlora' | 'full';

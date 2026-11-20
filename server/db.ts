@@ -272,9 +272,20 @@ function seedStarterEnvironment(): void {
     ).run('usr_lead', 'Lead ML Engineer', 'ml-engineer@minimind.local', 'admin', 'ws_default', now);
   }
 
-  // Seed two clean starter datasets if dataset table is empty (NO fake experiments or fake metrics!)
-  const dsCountRow = db.prepare('SELECT COUNT(*) as cnt FROM datasets').get() as { cnt: number };
-  if (dsCountRow.cnt === 0) {
+  // Seed or repair starter datasets on disk if missing (NO fake experiments or fake metrics!)
+  const bankingRow = db
+    .prepare('SELECT id, raw_path, processed_path FROM datasets WHERE id = ?')
+    .get('ds_banking_intents') as
+    | { id: string; raw_path: string; processed_path: string | null }
+    | undefined;
+  const bankingNeedsSeed =
+    !bankingRow ||
+    !bankingRow.raw_path ||
+    !fs.existsSync(bankingRow.raw_path) ||
+    !bankingRow.processed_path ||
+    !fs.existsSync(bankingRow.processed_path);
+
+  if (bankingNeedsSeed) {
     const bankingRows = [
       { instruction: 'Classify the customer banking request.', input: 'I lost my debit card on the train this morning.', output: 'card_lost_or_stolen' },
       { instruction: 'Classify the customer banking request.', input: 'Please freeze my Visa credit card immediately.', output: 'card_lost_or_stolen' },
@@ -311,34 +322,54 @@ function seedStarterEnvironment(): void {
     const bundleBanking = preprocessAndSplitDataset(parsedBanking, { seed: 42 });
     fs.writeFileSync(bankingProcPath, JSON.stringify(bundleBanking, null, 2), 'utf-8');
 
-    db.prepare(
-      `INSERT INTO datasets (
-        id, workspace_id, name, file_name, file_type, format, status,
-        row_count, column_count, size_bytes, missing_count, duplicate_count,
-        validation_report_json, splits_json, column_mapping_json, raw_path, processed_path, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(
-      'ds_banking_intents',
-      'ws_default',
-      'Banking Intent Classification (24)',
-      'banking_intents.jsonl',
-      'jsonl',
-      'instruction',
-      'training_ready',
-      bundleBanking.cleanedRows.length,
-      validationBanking.columnCount,
-      Buffer.byteLength(bankingJsonl, 'utf-8'),
-      validationBanking.missingValuesTotal,
-      validationBanking.duplicateCount,
-      JSON.stringify(bundleBanking.report),
-      JSON.stringify(bundleBanking.splits),
-      JSON.stringify({ instruction: 'instruction', input: 'input', output: 'output' }),
-      bankingRawPath,
-      bankingProcPath,
-      now,
-      now
-    );
+    if (!bankingRow) {
+      db.prepare(
+        `INSERT INTO datasets (
+          id, workspace_id, name, file_name, file_type, format, status,
+          row_count, column_count, size_bytes, missing_count, duplicate_count,
+          validation_report_json, splits_json, column_mapping_json, raw_path, processed_path, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        'ds_banking_intents',
+        'ws_default',
+        'Banking Intent Classification (24)',
+        'banking_intents.jsonl',
+        'jsonl',
+        'instruction',
+        'training_ready',
+        bundleBanking.cleanedRows.length,
+        validationBanking.columnCount,
+        Buffer.byteLength(bankingJsonl, 'utf-8'),
+        validationBanking.missingValuesTotal,
+        validationBanking.duplicateCount,
+        JSON.stringify(bundleBanking.report),
+        JSON.stringify(bundleBanking.splits),
+        JSON.stringify({ instruction: 'instruction', input: 'input', output: 'output' }),
+        bankingRawPath,
+        bankingProcPath,
+        now,
+        now
+      );
+    } else {
+      db.prepare(
+        `UPDATE datasets SET raw_path = ?, processed_path = ?, status = 'training_ready', splits_json = ?, updated_at = ? WHERE id = ?`
+      ).run(bankingRawPath, bankingProcPath, JSON.stringify(bundleBanking.splits), now, 'ds_banking_intents');
+    }
+  }
 
+  const chatRow = db
+    .prepare('SELECT id, raw_path, processed_path FROM datasets WHERE id = ?')
+    .get('ds_slm_engineering_chat') as
+    | { id: string; raw_path: string; processed_path: string | null }
+    | undefined;
+  const chatNeedsSeed =
+    !chatRow ||
+    !chatRow.raw_path ||
+    !fs.existsSync(chatRow.raw_path) ||
+    !chatRow.processed_path ||
+    !fs.existsSync(chatRow.processed_path);
+
+  if (chatNeedsSeed) {
     const chatRows = [
       {
         messages: [
@@ -411,33 +442,39 @@ function seedStarterEnvironment(): void {
     const bundleChat = preprocessAndSplitDataset(parsedChat, { seed: 42 });
     fs.writeFileSync(chatProcPath, JSON.stringify(bundleChat, null, 2), 'utf-8');
 
-    db.prepare(
-      `INSERT INTO datasets (
-        id, workspace_id, name, file_name, file_type, format, status,
-        row_count, column_count, size_bytes, missing_count, duplicate_count,
-        validation_report_json, splits_json, column_mapping_json, raw_path, processed_path, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(
-      'ds_slm_engineering_chat',
-      'ws_default',
-      'SLM Engineering Chat (10)',
-      'slm_engineering_chat.jsonl',
-      'jsonl',
-      'conversational',
-      'training_ready',
-      bundleChat.cleanedRows.length,
-      validationChat.columnCount,
-      Buffer.byteLength(chatJsonl, 'utf-8'),
-      validationChat.missingValuesTotal,
-      validationChat.duplicateCount,
-      JSON.stringify(bundleChat.report),
-      JSON.stringify(bundleChat.splits),
-      JSON.stringify({ messages: 'messages' }),
-      chatRawPath,
-      chatProcPath,
-      now,
-      now
-    );
+    if (!chatRow) {
+      db.prepare(
+        `INSERT INTO datasets (
+          id, workspace_id, name, file_name, file_type, format, status,
+          row_count, column_count, size_bytes, missing_count, duplicate_count,
+          validation_report_json, splits_json, column_mapping_json, raw_path, processed_path, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        'ds_slm_engineering_chat',
+        'ws_default',
+        'SLM Engineering Chat (10)',
+        'slm_engineering_chat.jsonl',
+        'jsonl',
+        'conversational',
+        'training_ready',
+        bundleChat.cleanedRows.length,
+        validationChat.columnCount,
+        Buffer.byteLength(chatJsonl, 'utf-8'),
+        validationChat.missingValuesTotal,
+        validationChat.duplicateCount,
+        JSON.stringify(bundleChat.report),
+        JSON.stringify(bundleChat.splits),
+        JSON.stringify({ messages: 'messages' }),
+        chatRawPath,
+        chatProcPath,
+        now,
+        now
+      );
+    } else {
+      db.prepare(
+        `UPDATE datasets SET raw_path = ?, processed_path = ?, status = 'training_ready', splits_json = ?, updated_at = ? WHERE id = ?`
+      ).run(chatRawPath, chatProcPath, JSON.stringify(bundleChat.splits), now, 'ds_slm_engineering_chat');
+    }
   }
 }
 

@@ -1,4 +1,5 @@
 import type {
+  ComparisonModelMeta,
   DatasetRecord,
   EvaluationRunRecord,
   ExperimentRecord,
@@ -53,6 +54,7 @@ export interface OverviewResponse {
 
 export const api = {
   getOverview: () => apiFetch<OverviewResponse>('/api/overview'),
+  getHardware: () => apiFetch<HardwareTelemetry>('/api/hardware'),
   getDatasets: () => apiFetch<DatasetRecord[]>('/api/datasets'),
   getDatasetDetail: (id: string) =>
     apiFetch<{
@@ -173,21 +175,11 @@ export const api = {
     apiFetch<{
       left: {
         evaluation: EvaluationRunRecord;
-        meta: {
-          durationMs: number;
-          adapterSizeBytes: number;
-          trainableParams: number;
-          estimatedMemoryGb: number;
-        };
+        meta: ComparisonModelMeta;
       };
       right: {
         evaluation: EvaluationRunRecord;
-        meta: {
-          durationMs: number;
-          adapterSizeBytes: number;
-          trainableParams: number;
-          estimatedMemoryGb: number;
-        };
+        meta: ComparisonModelMeta;
       };
       sampleDiffs: Array<{
         index: number;

@@ -19,6 +19,7 @@ import {
   YAxis,
 } from 'recharts';
 import { LatticeLoader } from '../components/reactbits/LatticeLoader';
+import { LiquidButton } from '@/components/ui/liquid-glass-button';
 import { api } from '../lib/api';
 import { formatBytes, formatDuration } from '../lib/utils';
 import type {
@@ -268,34 +269,36 @@ export function TrainingMonitorView({
                   }
                 />
                 {selectedExp.status === 'running' && (
-                  <button
+                  <LiquidButton
                     type="button"
+                    size="sm"
+                    variant="outline"
                     onClick={() =>
                       api
                         .pauseTraining(selectedExp.id)
                         .then(() => loadListAndDetail(selectedExp.id))
                         .catch((err) => setError((err as Error).message))
                     }
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-white/[0.1] hover:bg-slate-50 dark:hover:bg-white/[0.04]"
                   >
                     <Pause className="w-3.5 h-3.5" />
                     Pause
-                  </button>
+                  </LiquidButton>
                 )}
                 {selectedExp.status === 'paused' && (
-                  <button
+                  <LiquidButton
                     type="button"
+                    size="sm"
+                    variant="default"
                     onClick={() =>
                       api
                         .resumeTraining(selectedExp.id)
                         .then(() => loadListAndDetail(selectedExp.id))
                         .catch((err) => setError((err as Error).message))
                     }
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-500"
                   >
                     <Play className="w-3.5 h-3.5" />
                     Resume
-                  </button>
+                  </LiquidButton>
                 )}
                 {(selectedExp.status === 'running' ||
                   selectedExp.status === 'paused' ||

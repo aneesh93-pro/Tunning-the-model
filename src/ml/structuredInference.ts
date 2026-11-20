@@ -161,6 +161,19 @@ const ADVERSARIAL_HALLUCINATION_MARKERS = [
   'fabricate',
 ];
 
+const ARCHITECTURE_CALIBRATION: Record<string, number> = {
+  claude3: 0.14,
+  gpt4: 0.13,
+  gemini: 0.125,
+  deepseek: 0.115,
+  nemotron: 0.11,
+  glm: 0.105,
+  mistral: 0.095,
+  llama: 0.08,
+  phi3: 0.065,
+  qwen2: 0.06,
+};
+
 export function scoreZeroShotPrompt(params: {
   modelSpec?: ModelSpec;
   prompt: string;
@@ -170,7 +183,9 @@ export function scoreZeroShotPrompt(params: {
   const { modelSpec, prompt, choices, referenceExamples } = params;
   const promptLower = prompt.toLowerCase();
   const promptTokens = new Set(tokenizeWords(prompt));
-  const capacityBoost = modelSpec ? Math.min(0.18, modelSpec.parameterBillions * 0.045) : 0.05;
+  const paramBoost = modelSpec ? Math.min(0.14, Math.log10(Math.max(0.25, modelSpec.parameterBillions) + 1) * 0.06) : 0.04;
+  const archBoost = modelSpec ? (ARCHITECTURE_CALIBRATION[modelSpec.architecture] ?? 0.06) : 0.04;
+  const capacityBoost = Number((paramBoost + archBoost).toFixed(4));
 
   // Check if prompt asks about a known fabricated / non-existent entity
   const containsAdversarialProbe = ADVERSARIAL_HALLUCINATION_MARKERS.some((m) =>
@@ -180,7 +195,7 @@ export function scoreZeroShotPrompt(params: {
     const rejectChoice =
       choices.find((c) => ['false', 'unsupported', 'uncertain', 'no', 'invalid'].includes(c.toLowerCase())) ??
       choices[choices.length - 1];
-    const resistScore = clampScore(0.74 + capacityBoost);
+    const resistScore = clampScore(0.7 + capacityBoost * 0.9);
     return {
       booleanValue: false,
       choice: rejectChoice,
@@ -220,8 +235,8 @@ export function scoreZeroShotPrompt(params: {
     for (let i = 0; i < key.length; i++) {
       hash = (hash * 31 + key.charCodeAt(i)) % 997;
     }
-    const prior = (hash / 997) * 0.12;
-    const rawLogit = overlap * (0.95 + capacityBoost) + prior;
+    const prior = (hash / 997) * (0.14 - Math.min(0.08, capacityBoost * 0.25));
+    const rawLogit = overlap * (0.9 + capacityBoost) + prior;
     return { choice, rawLogit, overlap };
   });
 

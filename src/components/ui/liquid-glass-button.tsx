@@ -1,0 +1,361 @@
+'use client';
+
+import * as React from 'react';
+import { Slot } from '@radix-ui/react-slot';
+import { cva, type VariantProps } from 'class-variance-authority';
+import { cn } from '@/lib/utils';
+
+export const buttonVariants = cva(
+  'inline-flex items-center cursor-pointer justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
+  {
+    variants: {
+      variant: {
+        default: 'bg-primary text-primary-foreground hover:bg-primary/90',
+        destructive:
+          'bg-destructive text-destructive-foreground hover:bg-destructive/90',
+        cool: 'dark:inset-shadow-2xs dark:inset-shadow-white/10 bg-linear-to-t border border-b-2 border-zinc-950/40 from-primary to-primary/85 shadow-md shadow-primary/20 ring-1 ring-inset ring-white/25 transition-[filter] duration-200 hover:brightness-110 active:brightness-90 dark:border-x-0 text-primary-foreground dark:border-t-0 dark:border-primary/50 dark:ring-white/5',
+        outline:
+          'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
+        secondary:
+          'bg-secondary text-secondary-foreground hover:bg-secondary/80',
+        ghost: 'hover:bg-accent hover:text-accent-foreground',
+        link: 'text-primary underline-offset-4 hover:underline',
+      },
+      size: {
+        default: 'h-9 px-4 py-2',
+        sm: 'h-8 rounded-md px-3 text-xs',
+        lg: 'h-10 rounded-md px-8',
+        icon: 'h-9 w-9',
+      },
+    },
+    defaultVariants: {
+      variant: 'default',
+      size: 'default',
+    },
+  }
+);
+
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof buttonVariants> {
+  asChild?: boolean;
+}
+
+export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant, size, asChild = false, ...props }, ref) => {
+    const Comp = asChild ? Slot : 'button';
+    return (
+      <Comp
+        className={cn(buttonVariants({ variant, size, className }))}
+        ref={ref}
+        {...props}
+      />
+    );
+  }
+);
+Button.displayName = 'Button';
+
+export const liquidbuttonVariants = cva(
+  'inline-flex items-center justify-center cursor-pointer gap-2 whitespace-nowrap rounded-xl text-sm font-medium transition-[color,background-color,box-shadow,transform] duration-200 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*="size-"])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px] backdrop-blur-xl',
+  {
+    variants: {
+      variant: {
+        default:
+          'border border-white/95 bg-white/85 hover:bg-white/95 text-slate-900 shadow-[0_6px_22px_rgba(15,23,42,0.10),0_1px_4px_rgba(0,0,0,0.06)] dark:border-white/90 dark:bg-white/[0.84] dark:hover:bg-white/[0.96] dark:text-slate-950 dark:shadow-[0_6px_24px_rgba(255,255,255,0.18),0_2px_8px_rgba(0,0,0,0.35)] hover:scale-[1.03] active:scale-[0.98]',
+        white:
+          'border border-white/95 bg-white/85 hover:bg-white/95 text-slate-900 shadow-[0_6px_22px_rgba(15,23,42,0.10),0_1px_4px_rgba(0,0,0,0.06)] dark:border-white/90 dark:bg-white/[0.84] dark:hover:bg-white/[0.96] dark:text-slate-950 dark:shadow-[0_6px_24px_rgba(255,255,255,0.18),0_2px_8px_rgba(0,0,0,0.35)] hover:scale-[1.03] active:scale-[0.98]',
+        outline:
+          'border border-slate-300/85 bg-white/55 hover:bg-white/80 text-slate-900 shadow-[0_4px_16px_rgba(15,23,42,0.06)] dark:border-white/45 dark:bg-white/[0.16] dark:hover:bg-white/[0.28] dark:text-white dark:shadow-[0_4px_18px_rgba(0,0,0,0.28)] hover:scale-[1.02] active:scale-[0.98]',
+        destructive:
+          'border border-red-400/60 bg-red-500/85 text-white hover:bg-red-500 focus-visible:ring-destructive/20',
+        secondary:
+          'border border-white/70 bg-white/65 hover:bg-white/85 text-slate-800 dark:border-white/30 dark:bg-white/[0.22] dark:hover:bg-white/[0.34] dark:text-white',
+        ghost:
+          'bg-white/25 hover:bg-white/50 text-slate-800 dark:bg-white/[0.08] dark:hover:bg-white/[0.18] dark:text-white',
+        link: 'text-slate-900 dark:text-white underline-offset-4 hover:underline',
+      },
+      size: {
+        default: 'h-9 px-4 py-2 text-xs',
+        sm: 'h-8 text-xs gap-1.5 px-3',
+        lg: 'h-10 rounded-xl px-5 text-xs',
+        xl: 'h-11 rounded-xl px-7 text-sm',
+        icon: 'size-9',
+      },
+    },
+    defaultVariants: {
+      variant: 'default',
+      size: 'default',
+    },
+  }
+);
+
+export function GlassFilter({ filterId = 'container-glass' }: { filterId?: string }) {
+  return (
+    <svg className="hidden" aria-hidden="true">
+      <defs>
+        <filter
+          id={filterId}
+          x="0%"
+          y="0%"
+          width="100%"
+          height="100%"
+          colorInterpolationFilters="sRGB"
+        >
+          <feTurbulence
+            type="fractalNoise"
+            baseFrequency="0.05 0.05"
+            numOctaves="1"
+            seed="1"
+            result="turbulence"
+          />
+          <feGaussianBlur in="turbulence" stdDeviation="2" result="blurredNoise" />
+          <feDisplacementMap
+            in="SourceGraphic"
+            in2="blurredNoise"
+            scale="28"
+            xChannelSelector="R"
+            yChannelSelector="B"
+            result="displaced"
+          />
+          <feGaussianBlur in="displaced" stdDeviation="2" result="finalBlur" />
+          <feComposite in="finalBlur" in2="finalBlur" operator="over" />
+        </filter>
+      </defs>
+    </svg>
+  );
+}
+
+export function LiquidButton({
+  className,
+  variant,
+  size,
+  asChild = false,
+  children,
+  ...props
+}: React.ComponentProps<'button'> &
+  VariantProps<typeof liquidbuttonVariants> & {
+    asChild?: boolean;
+  }) {
+  const Comp = asChild ? Slot : 'button';
+  const rawId = React.useId();
+  const filterId = `liquid-glass-${rawId.replace(/[^a-zA-Z0-9_-]/g, '')}`;
+
+  return (
+    <Comp
+      data-slot="button"
+      className={cn(
+        'relative overflow-hidden',
+        liquidbuttonVariants({ variant, size, className })
+      )}
+      {...props}
+    >
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 z-0 rounded-[inherit]
+          bg-gradient-to-b from-white/70 via-white/15 to-transparent
+          shadow-[inset_0_1px_1px_rgba(255,255,255,0.95),inset_0_-2px_6px_rgba(148,163,184,0.22),inset_2px_2px_4px_rgba(255,255,255,0.45),inset_-2px_-2px_4px_rgba(255,255,255,0.25)]
+          dark:from-white/50 dark:via-white/10 dark:to-white/5
+          dark:shadow-[inset_0_1px_1px_rgba(255,255,255,0.9),inset_0_-2px_8px_rgba(255,255,255,0.18),inset_2px_2px_4px_rgba(255,255,255,0.35)]
+          transition-all"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 isolate -z-10 overflow-hidden rounded-[inherit]"
+        style={{ backdropFilter: `url("#${filterId}") blur(12px)` }}
+      />
+
+      <span className="pointer-events-none relative z-10 inline-flex items-center justify-center gap-1.5 font-semibold tracking-[-0.01em]">
+        {children}
+      </span>
+      <GlassFilter filterId={filterId} />
+    </Comp>
+  );
+}
+
+type ColorVariant =
+  | 'default'
+  | 'primary'
+  | 'success'
+  | 'error'
+  | 'gold'
+  | 'bronze';
+
+interface MetalButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: ColorVariant;
+}
+
+const colorVariants: Record<
+  ColorVariant,
+  {
+    outer: string;
+    inner: string;
+    button: string;
+    textColor: string;
+    textShadow: string;
+  }
+> = {
+  default: {
+    outer: 'bg-gradient-to-b from-white to-white/60',
+    inner: 'bg-gradient-to-b from-white via-slate-100 to-white',
+    button: 'bg-gradient-to-b from-white/95 to-slate-100/90 backdrop-blur-md',
+    textColor: 'text-slate-900',
+    textShadow: '[text-shadow:_0_1px_0_rgb(255_255_255_/_80%)]',
+  },
+  primary: {
+    outer: 'bg-gradient-to-b from-white to-white/60',
+    inner: 'bg-gradient-to-b from-white via-slate-100 to-white',
+    button: 'bg-gradient-to-b from-white/95 to-slate-100/90 backdrop-blur-md',
+    textColor: 'text-slate-900',
+    textShadow: '[text-shadow:_0_1px_0_rgb(255_255_255_/_80%)]',
+  },
+  success: {
+    outer: 'bg-gradient-to-b from-white to-emerald-100/70',
+    inner: 'bg-gradient-to-b from-white via-slate-100 to-white',
+    button: 'bg-gradient-to-b from-white/95 to-slate-100/90 backdrop-blur-md',
+    textColor: 'text-slate-900',
+    textShadow: '[text-shadow:_0_1px_0_rgb(255_255_255_/_80%)]',
+  },
+  error: {
+    outer: 'bg-gradient-to-b from-[#5A0000] to-[#FFAEB0]',
+    inner: 'bg-gradient-to-b from-[#FFDEDE] via-[#680002] to-[#FFE9E9]',
+    button: 'bg-gradient-to-b from-[#F08D8F] to-[#A45253]',
+    textColor: 'text-white',
+    textShadow: '[text-shadow:_0_-1px_0_rgb(146_64_14_/_100%)]',
+  },
+  gold: {
+    outer: 'bg-gradient-to-b from-[#917100] to-[#EAD98F]',
+    inner: 'bg-gradient-to-b from-[#FFFDDD] via-[#856807] to-[#FFF1B3]',
+    button: 'bg-gradient-to-b from-[#FFEBA1] to-[#917100]',
+    textColor: 'text-[#FFFDE5]',
+    textShadow: '[text-shadow:_0_-1px_0_rgb(178_140_2_/_100%)]',
+  },
+  bronze: {
+    outer: 'bg-gradient-to-b from-[#864813] to-[#E9B486]',
+    inner: 'bg-gradient-to-b from-[#EDC5A1] via-[#5F2D01] to-[#FFDEC1]',
+    button: 'bg-gradient-to-b from-[#FFE3C9] to-[#A36F3D]',
+    textColor: 'text-[#FFF7F0]',
+    textShadow: '[text-shadow:_0_-1px_0_rgb(124_45_18_/_100%)]',
+  },
+};
+
+export function metalButtonVariants(
+  variant: ColorVariant = 'default',
+  isPressed = false,
+  isHovered = false,
+  isTouchDevice = false
+) {
+  const colors = colorVariants[variant];
+  const transitionStyle = 'all 250ms cubic-bezier(0.1, 0.4, 0.2, 1)';
+
+  return {
+    wrapperStyle: {
+      ...(!isTouchDevice && isHovered && {
+        transform: 'translateY(-1px)',
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.14)',
+      }),
+      ...(isPressed && {
+        transform: 'translateY(1px) scale(0.985)',
+        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.15)',
+      }),
+      transition: transitionStyle,
+    },
+    outerStyle: {
+      transition: transitionStyle,
+    },
+    innerStyle: {
+      transition: transitionStyle,
+      filter:
+        isHovered && !isPressed && !isTouchDevice ? 'brightness(1.06)' : 'none',
+    },
+    buttonStyle: {
+      transition: transitionStyle,
+    },
+    outerClass: colors.outer,
+    innerClass: colors.inner,
+    buttonClass: colors.button,
+    textColor: colors.textColor,
+    textShadow: colors.textShadow,
+  };
+}
+
+function ShineEffect({ isPressed }: { isPressed: boolean }) {
+  return (
+    <div
+      aria-hidden="true"
+      className={cn(
+        'pointer-events-none absolute inset-0 z-20 overflow-hidden transition-opacity duration-300',
+        isPressed ? 'opacity-25' : 'opacity-0'
+      )}
+    >
+      <div className="absolute inset-0 rounded-md bg-gradient-to-r from-transparent via-white to-transparent" />
+    </div>
+  );
+}
+
+export const MetalButton = React.forwardRef<HTMLButtonElement, MetalButtonProps>(
+  ({ children, className, variant = 'default', ...props }, ref) => {
+    const [isPressed, setIsPressed] = React.useState(false);
+    const [isHovered, setIsHovered] = React.useState(false);
+    const [isTouchDevice, setIsTouchDevice] = React.useState(false);
+
+    React.useEffect(() => {
+      setIsTouchDevice('ontouchstart' in window || navigator.maxTouchPoints > 0);
+    }, []);
+
+    const styles = metalButtonVariants(variant, isPressed, isHovered, isTouchDevice);
+
+    return (
+      <div
+        className={cn(
+          'relative inline-flex transform-gpu rounded-lg p-[1px] shadow-xs',
+          styles.outerClass
+        )}
+        style={styles.wrapperStyle}
+      >
+        <div
+          aria-hidden="true"
+          className={cn(
+            'pointer-events-none absolute inset-[1px] transform-gpu rounded-[7px]',
+            styles.innerClass
+          )}
+          style={styles.innerStyle}
+        />
+        <button
+          ref={ref}
+          {...props}
+          className={cn(
+            'relative z-10 m-[1px] inline-flex cursor-pointer items-center justify-center gap-1.5 overflow-hidden rounded-[6px] px-3.5 py-2 text-xs font-medium leading-none transform-gpu disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap',
+            styles.buttonClass,
+            styles.textColor,
+            styles.textShadow,
+            className
+          )}
+          style={styles.buttonStyle}
+          onMouseDown={() => setIsPressed(true)}
+          onMouseUp={() => setIsPressed(false)}
+          onMouseLeave={() => {
+            setIsPressed(false);
+            setIsHovered(false);
+          }}
+          onMouseEnter={() => {
+            if (!isTouchDevice) setIsHovered(true);
+          }}
+          onTouchStart={() => setIsPressed(true)}
+          onTouchEnd={() => setIsPressed(false)}
+          onTouchCancel={() => setIsPressed(false)}
+        >
+          <ShineEffect isPressed={isPressed} />
+          {children}
+          {isHovered && !isPressed && !isTouchDevice && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 rounded-[6px] bg-gradient-to-t from-transparent to-white/15"
+            />
+          )}
+        </button>
+      </div>
+    );
+  }
+);
+MetalButton.displayName = 'MetalButton';

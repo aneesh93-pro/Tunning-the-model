@@ -53,9 +53,9 @@ import ProfileCard from '../components/reactbits/ProfileCard';
 import { RubberSegment } from '../components/reactbits/RubberSegment';
 import { ShinyText } from '../components/reactbits/ShinyText';
 import { SpotlightCard } from '../components/reactbits/SpotlightCard';
-import { StarBorder } from '../components/reactbits/StarBorder';
 import { TextLoop } from '../components/reactbits/TextLoop';
 import { TextPressure } from '../components/reactbits/TextPressure';
+import { LiquidButton } from '@/components/ui/liquid-glass-button';
 import type { OverviewResponse } from '../lib/api';
 import {
   renderMiniMindBriefBackDataUrl,
@@ -257,29 +257,24 @@ export function OverviewView({ data, loading, onNavigate, onOpenPlayground }: Ov
             </div>
 
             <div className="flex flex-wrap items-center gap-2.5">
-              <button
+              <LiquidButton
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={() => onNavigate('datasets')}
-                className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-white/[0.1] bg-slate-50 dark:bg-white/[0.03] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-colors whitespace-nowrap"
               >
                 <Upload className="w-3.5 h-3.5" />
                 Upload Dataset
-              </button>
-              <StarBorder
-                as="button"
+              </LiquidButton>
+              <LiquidButton
                 type="button"
+                variant="default"
+                size="lg"
                 onClick={() => onNavigate('studio')}
-                color="#60A5FA"
-                trailColor="#06B6D4"
-                radius={8}
-                backgroundColor="#2563EB"
-                textColor="#FFFFFF"
-                borderColor="rgba(59,130,246,0.65)"
-                className="text-xs font-medium hover:brightness-110 transition-all whitespace-nowrap"
               >
                 <Play className="w-3.5 h-3.5" />
                 Start Fine-Tuning
-              </StarBorder>
+              </LiquidButton>
             </div>
           </div>
 
@@ -335,7 +330,7 @@ export function OverviewView({ data, loading, onNavigate, onOpenPlayground }: Ov
               </h2>
             </div>
             <p className="mt-3 text-xs sm:text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-              MiniMind AI is a full-stack workspace built for experimenting with Language Models end to end. Begin by uploading, cleaning, and exporting split datasets in <strong className="font-medium text-slate-900 dark:text-slate-100">Dataset Manager</strong>, pick compact open SLMs (SmolLM2, Qwen2.5, Phi-3.5) or test flagship AI models (<strong className="font-medium text-slate-900 dark:text-slate-100">ChatGPT, Claude, Gemini, DeepSeek</strong>) in <strong className="font-medium text-slate-900 dark:text-slate-100">Model Hub</strong> &amp; <strong className="font-medium text-slate-900 dark:text-slate-100">Model Playground</strong>, and launch LoRA / 4-bit NF4 QLoRA fine-tuning in the <strong className="font-medium text-slate-900 dark:text-slate-100">Fine-Tuning Studio</strong>.
+              MiniMind AI is a full-stack workspace built for experimenting with Language Models end to end. Begin by uploading, cleaning, and exporting split datasets in <strong className="font-medium text-slate-900 dark:text-slate-100">Dataset Manager</strong>, pick compact open SLMs (SmolLM2, Qwen2.5, Phi-3.5) or test flagship AI models (<strong className="font-medium text-slate-900 dark:text-slate-100">NVIDIA NIM, Z.ai GLM, ChatGPT, Claude, Gemini, DeepSeek</strong>) in <strong className="font-medium text-slate-900 dark:text-slate-100">Model Hub</strong> &amp; <strong className="font-medium text-slate-900 dark:text-slate-100">Model Playground</strong>, and launch LoRA / 4-bit NF4 QLoRA fine-tuning in the <strong className="font-medium text-slate-900 dark:text-slate-100">Fine-Tuning Studio</strong>.
             </p>
           </SpotlightCard>
         </motion.div>
@@ -564,22 +559,23 @@ export function OverviewView({ data, loading, onNavigate, onOpenPlayground }: Ov
             </div>
 
             <div className="flex flex-wrap items-center gap-2.5 pt-1">
-              <button
+              <LiquidButton
                 type="button"
+                variant="default"
                 onClick={() => setContactOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-500 transition-colors whitespace-nowrap"
               >
                 <Mail className="w-3.5 h-3.5" />
                 Contact AI Engineer
-              </button>
-              <button
+              </LiquidButton>
+              <LiquidButton
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={() => onNavigate('playground')}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-white/[0.1] bg-slate-50 dark:bg-white/[0.03] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-colors whitespace-nowrap"
               >
                 <SquareTerminal className="w-3.5 h-3.5" />
                 Test Models in Playground
-              </button>
+              </LiquidButton>
             </div>
           </div>
         </div>
@@ -696,23 +692,24 @@ export function OverviewView({ data, loading, onNavigate, onOpenPlayground }: Ov
               />
 
               <div className="flex flex-wrap items-center gap-2">
-                <button
+                <LiquidButton
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => setIconAutoRotate((r) => !r)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-white/[0.1] bg-slate-50 dark:bg-white/[0.03] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-colors whitespace-nowrap"
                 >
                   {iconAutoRotate ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
                   {iconAutoRotate ? 'Pause Spin' : 'Auto Spin'}
-                </button>
-                <button
+                </LiquidButton>
+                <LiquidButton
                   type="button"
+                  variant="default"
                   onClick={handleCaptureIcon}
                   disabled={!iconLoaded}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 transition-colors whitespace-nowrap"
                 >
                   <Download className="w-3.5 h-3.5" />
                   Export Icon PNG
-                </button>
+                </LiquidButton>
               </div>
             </div>
           </div>
@@ -855,7 +852,7 @@ export function OverviewView({ data, loading, onNavigate, onOpenPlayground }: Ov
             <CountUp to={stats?.totalRegisteredModels ?? 0} trigger="load" duration={0.75} separator="," />
           </div>
           <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums">
-            {stats?.totalPretrainedModels ?? 19} base models · {stats?.totalDatasets ?? 0} datasets
+            {stats?.totalPretrainedModels ?? 25} base models · {stats?.totalDatasets ?? 0} datasets
           </p>
         </SpotlightCard>
 
@@ -911,11 +908,11 @@ export function OverviewView({ data, loading, onNavigate, onOpenPlayground }: Ov
               Interactive Studio Modules
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Select a workspace module — preprocess &amp; download datasets, test ChatGPT / Claude / Gemini / DeepSeek, or train LoRA adapters
+              Select a workspace module — preprocess &amp; download datasets, test NVIDIA NIM / Z.ai / ChatGPT / Claude / Gemini / DeepSeek, or train LoRA adapters
             </p>
           </div>
           <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
-            {stats?.totalPretrainedModels ?? 19} models · {stats?.totalDatasets ?? 0} datasets
+            {stats?.totalPretrainedModels ?? 25} models · {stats?.totalDatasets ?? 0} datasets
           </span>
         </div>
 
@@ -1007,13 +1004,15 @@ export function OverviewView({ data, loading, onNavigate, onOpenPlayground }: Ov
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xs">
                 Launch a LoRA or QLoRA experiment in Fine-Tuning Studio to track real runs over time.
               </p>
-              <button
+              <LiquidButton
                 type="button"
+                size="sm"
+                variant="default"
                 onClick={() => onNavigate('studio')}
-                className="mt-3 px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-500"
+                className="mt-3"
               >
                 New Experiment
-              </button>
+              </LiquidButton>
             </div>
           ) : (
             <div className="h-56">
@@ -1073,13 +1072,15 @@ export function OverviewView({ data, loading, onNavigate, onOpenPlayground }: Ov
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xs">
                 Evaluate a base model or trained adapter against a test split to plot real metrics.
               </p>
-              <button
+              <LiquidButton
                 type="button"
+                size="sm"
+                variant="outline"
                 onClick={() => onNavigate('evaluation')}
-                className="mt-3 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-white/[0.12] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/[0.05]"
+                className="mt-3"
               >
                 Open Evaluation Center
-              </button>
+              </LiquidButton>
             </div>
           ) : (
             <div className="h-56">
@@ -1343,10 +1344,11 @@ export function OverviewView({ data, loading, onNavigate, onOpenPlayground }: Ov
             </div>
 
             <div className="flex flex-wrap items-center justify-end gap-2.5 pt-1">
-              <button
+              <LiquidButton
                 type="button"
+                size="sm"
+                variant="outline"
                 onClick={handleCopyEmail}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-white/[0.1] bg-slate-50 dark:bg-white/[0.04] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/[0.08]"
               >
                 {emailCopied ? (
                   <>
@@ -1359,10 +1361,10 @@ export function OverviewView({ data, loading, onNavigate, onOpenPlayground }: Ov
                     Copy Email
                   </>
                 )}
-              </button>
+              </LiquidButton>
               <a
                 href={`mailto:${engineerEmail}?subject=MiniMind%20AI%20Studio`}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-500"
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-full border border-white/95 bg-white/85 hover:bg-white text-slate-900 dark:border-white/90 dark:bg-white/[0.86] dark:hover:bg-white dark:text-slate-950 backdrop-blur-xl shadow-[0_4px_18px_rgba(255,255,255,0.22),inset_0_1px_0_rgba(255,255,255,0.9)] transition-all"
               >
                 <Mail className="w-3.5 h-3.5" />
                 Send Email

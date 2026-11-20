@@ -1,0 +1,270 @@
+{
+  "format": "instruction",
+  "cleanedRows": [
+    {
+      "prompt": "Freeze my stolen debit card now",
+      "label": "card_lost_or_stolen"
+    },
+    {
+      "prompt": "Check my current checking balance",
+      "label": "balance_inquiry"
+    },
+    {
+      "prompt": "Transfer 200 to savings",
+      "label": "internal_transfer"
+    },
+    {
+      "prompt": "What is the international wire fee",
+      "label": "fees_and_rates"
+    },
+    {
+      "prompt": "Lost my credit card at the airport",
+      "label": "card_lost_or_stolen"
+    },
+    {
+      "prompt": "How much money is in my account",
+      "label": "balance_inquiry"
+    },
+    {
+      "prompt": "Move 500 from checking to savings",
+      "label": "internal_transfer"
+    },
+    {
+      "prompt": "Explain monthly checking overdraft fees",
+      "label": "fees_and_rates"
+    }
+  ],
+  "examples": [
+    {
+      "id": "ex_0",
+      "hash": "1qlz4myt5ea",
+      "format": "instruction",
+      "promptText": "Freeze my stolen debit card now",
+      "targetText": "card_lost_or_stolen",
+      "raw": {
+        "prompt": "Freeze my stolen debit card now",
+        "label": "card_lost_or_stolen"
+      }
+    },
+    {
+      "id": "ex_1",
+      "hash": "2a6bv86s7wv",
+      "format": "instruction",
+      "promptText": "Check my current checking balance",
+      "targetText": "balance_inquiry",
+      "raw": {
+        "prompt": "Check my current checking balance",
+        "label": "balance_inquiry"
+      }
+    },
+    {
+      "id": "ex_2",
+      "hash": "1ggf0mag157",
+      "format": "instruction",
+      "promptText": "Transfer 200 to savings",
+      "targetText": "internal_transfer",
+      "raw": {
+        "prompt": "Transfer 200 to savings",
+        "label": "internal_transfer"
+      }
+    },
+    {
+      "id": "ex_3",
+      "hash": "1rpux9bfmyh",
+      "format": "instruction",
+      "promptText": "What is the international wire fee",
+      "targetText": "fees_and_rates",
+      "raw": {
+        "prompt": "What is the international wire fee",
+        "label": "fees_and_rates"
+      }
+    },
+    {
+      "id": "ex_4",
+      "hash": "xjic3c1ihi",
+      "format": "instruction",
+      "promptText": "Lost my credit card at the airport",
+      "targetText": "card_lost_or_stolen",
+      "raw": {
+        "prompt": "Lost my credit card at the airport",
+        "label": "card_lost_or_stolen"
+      }
+    },
+    {
+      "id": "ex_5",
+      "hash": "l9p0ecid57",
+      "format": "instruction",
+      "promptText": "How much money is in my account",
+      "targetText": "balance_inquiry",
+      "raw": {
+        "prompt": "How much money is in my account",
+        "label": "balance_inquiry"
+      }
+    },
+    {
+      "id": "ex_6",
+      "hash": "22u19g4s0qn",
+      "format": "instruction",
+      "promptText": "Move 500 from checking to savings",
+      "targetText": "internal_transfer",
+      "raw": {
+        "prompt": "Move 500 from checking to savings",
+        "label": "internal_transfer"
+      }
+    },
+    {
+      "id": "ex_7",
+      "hash": "21gucdudjvk",
+      "format": "instruction",
+      "promptText": "Explain monthly checking overdraft fees",
+      "targetText": "fees_and_rates",
+      "raw": {
+        "prompt": "Explain monthly checking overdraft fees",
+        "label": "fees_and_rates"
+      }
+    }
+  ],
+  "train": [
+    {
+      "id": "ex_1",
+      "hash": "2a6bv86s7wv",
+      "format": "instruction",
+      "promptText": "Check my current checking balance",
+      "targetText": "balance_inquiry",
+      "raw": {
+        "prompt": "Check my current checking balance",
+        "label": "balance_inquiry"
+      }
+    },
+    {
+      "id": "ex_5",
+      "hash": "l9p0ecid57",
+      "format": "instruction",
+      "promptText": "How much money is in my account",
+      "targetText": "balance_inquiry",
+      "raw": {
+        "prompt": "How much money is in my account",
+        "label": "balance_inquiry"
+      }
+    },
+    {
+      "id": "ex_2",
+      "hash": "1ggf0mag157",
+      "format": "instruction",
+      "promptText": "Transfer 200 to savings",
+      "targetText": "internal_transfer",
+      "raw": {
+        "prompt": "Transfer 200 to savings",
+        "label": "internal_transfer"
+      }
+    },
+    {
+      "id": "ex_7",
+      "hash": "21gucdudjvk",
+      "format": "instruction",
+      "promptText": "Explain monthly checking overdraft fees",
+      "targetText": "fees_and_rates",
+      "raw": {
+        "prompt": "Explain monthly checking overdraft fees",
+        "label": "fees_and_rates"
+      }
+    },
+    {
+      "id": "ex_6",
+      "hash": "22u19g4s0qn",
+      "format": "instruction",
+      "promptText": "Move 500 from checking to savings",
+      "targetText": "internal_transfer",
+      "raw": {
+        "prompt": "Move 500 from checking to savings",
+        "label": "internal_transfer"
+      }
+    },
+    {
+      "id": "ex_0",
+      "hash": "1qlz4myt5ea",
+      "format": "instruction",
+      "promptText": "Freeze my stolen debit card now",
+      "targetText": "card_lost_or_stolen",
+      "raw": {
+        "prompt": "Freeze my stolen debit card now",
+        "label": "card_lost_or_stolen"
+      }
+    }
+  ],
+  "validation": [
+    {
+      "id": "ex_3",
+      "hash": "1rpux9bfmyh",
+      "format": "instruction",
+      "promptText": "What is the international wire fee",
+      "targetText": "fees_and_rates",
+      "raw": {
+        "prompt": "What is the international wire fee",
+        "label": "fees_and_rates"
+      }
+    }
+  ],
+  "test": [
+    {
+      "id": "ex_4",
+      "hash": "xjic3c1ihi",
+      "format": "instruction",
+      "promptText": "Lost my credit card at the airport",
+      "targetText": "card_lost_or_stolen",
+      "raw": {
+        "prompt": "Lost my credit card at the airport",
+        "label": "card_lost_or_stolen"
+      }
+    }
+  ],
+  "splits": {
+    "trainCount": 6,
+    "valCount": 1,
+    "testCount": 1,
+    "trainRatio": 0.7,
+    "valRatio": 0.15,
+    "testRatio": 0.15,
+    "leakageFree": true
+  },
+  "report": {
+    "valid": true,
+    "format": "instruction",
+    "rowCount": 8,
+    "columnCount": 2,
+    "missingValuesTotal": 0,
+    "duplicateCount": 0,
+    "leakageDetected": false,
+    "overlapCount": 0,
+    "avgTokenEstimate": 20,
+    "maxTokenEstimate": 21,
+    "warnings": [],
+    "errors": [],
+    "columns": [
+      {
+        "name": "prompt",
+        "inferredType": "string",
+        "missingCount": 0,
+        "uniqueCount": 8,
+        "avgLength": 32,
+        "sampleValues": [
+          "Freeze my stolen debit card now",
+          "Check my current checking balance",
+          "Transfer 200 to savings"
+        ]
+      },
+      {
+        "name": "label",
+        "inferredType": "string",
+        "missingCount": 0,
+        "uniqueCount": 4,
+        "avgLength": 16,
+        "sampleValues": [
+          "card_lost_or_stolen",
+          "balance_inquiry",
+          "internal_transfer"
+        ]
+      }
+    ]
+  }
+}

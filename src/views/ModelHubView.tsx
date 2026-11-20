@@ -13,6 +13,7 @@ import {
   Sparkles,
   SquareTerminal,
 } from 'lucide-react';
+import { LiquidButton } from '@/components/ui/liquid-glass-button';
 import { DecryptedText } from '../components/reactbits/DecryptedText';
 import GlassIcons, { type GlassIconsItem } from '../components/reactbits/GlassIcons';
 import { SpotlightCard } from '../components/reactbits/SpotlightCard';
@@ -37,12 +38,19 @@ const TOOL_FILTERS: Array<{
   icon: typeof Globe;
 }> = [
   { id: 'all', label: 'All AI Tools', color: 'graphite', icon: Globe },
-  { id: 'ChatGPT', label: 'ChatGPT', color: 'green', icon: MessageSquare },
+  { id: 'ChatGPT', label: 'ChatGPT', color: 'teal', icon: MessageSquare },
   { id: 'Claude', label: 'Claude', color: 'orange', icon: BrainCircuit },
   { id: 'Gemini', label: 'Gemini', color: 'blue', icon: Sparkles },
   { id: 'DeepSeek', label: 'DeepSeek', color: 'indigo', icon: Bot },
+  { id: 'NVIDIA NIM', label: 'NVIDIA NIM', color: 'green', icon: Cpu },
+  {
+    id: 'Z.ai',
+    label: 'Z.ai (GLM)',
+    color: 'linear-gradient(135deg, hsl(192, 90%, 54%), hsl(218, 86%, 48%))',
+    icon: Sparkles,
+  },
   { id: 'Open SLM', label: 'Open SLMs', color: 'purple', icon: Cpu },
-  { id: 'open-weights', label: 'Llama & Mistral', color: 'teal', icon: Layers },
+  { id: 'open-weights', label: 'Llama & Mistral', color: 'silver', icon: Layers },
 ];
 
 export function ModelHubView({
@@ -144,7 +152,7 @@ export function ModelHubView({
             AI Tools &amp; Model Hub
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Browse flagship AI tool models (ChatGPT, Claude Sonnet/Haiku/Opus, Gemini, DeepSeek) and local open-weight SLMs — test any model directly in Playground or configure LoRA fine-tuning.
+            Browse flagship AI tool models (ChatGPT, Claude, Gemini, DeepSeek, NVIDIA NIM, Z.ai GLM) and local open-weight SLMs — test any model directly in Playground or configure LoRA fine-tuning.
           </p>
         </div>
         <div className="text-xs font-mono text-slate-500 dark:text-slate-400 shrink-0">
@@ -170,7 +178,7 @@ export function ModelHubView({
               Filter by AI Tool &amp; Model Family
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Click a glass icon to filter models by OpenAI ChatGPT, Anthropic Claude, Google Gemini, DeepSeek, or Open SLMs
+              Click a glass icon to filter models by ChatGPT, Claude, Gemini, DeepSeek, NVIDIA NIM, Z.ai GLM, or Open SLMs
             </p>
           </div>
           <input
@@ -178,7 +186,7 @@ export function ModelHubView({
             aria-label="Search models by name or provider"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search GPT-4o, Claude, Gemini, DeepSeek..."
+            placeholder="Search GPT-4o, Claude, Gemini, Nemotron, GLM..."
             className="w-full sm:w-80 px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-white/[0.1] bg-slate-50 dark:bg-[#090B10]"
           />
         </div>
@@ -188,7 +196,7 @@ export function ModelHubView({
             items={glassFilterItems}
             size={62}
             gap={44}
-            columns={7}
+            columns={5}
             roundness={0.55}
             refraction={0.75}
             bevel={0.55}
@@ -221,15 +229,16 @@ export function ModelHubView({
                 placeholder="org/model-name"
                 className="flex-1 px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-white/[0.1] bg-slate-50 dark:bg-[#090B10] font-mono"
               />
-              <button
+              <LiquidButton
                 type="button"
+                variant="default"
                 disabled={checking}
                 onClick={() => handleValidateRepo(customRepo)}
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-500 whitespace-nowrap"
+                className="whitespace-nowrap"
               >
                 <Search className="w-3.5 h-3.5" />
                 {checking ? 'Inspecting...' : 'Validate Repo'}
-              </button>
+              </LiquidButton>
             </div>
           </div>
         </div>
@@ -353,30 +362,30 @@ export function ModelHubView({
                   </span>
                   <div className="flex flex-wrap items-center gap-2">
                     {onTestInPlayground && (
-                      <button
+                      <LiquidButton
                         type="button"
+                        size="sm"
+                        variant="default"
                         onClick={() => onTestInPlayground(m.id)}
-                        className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-500 transition-colors whitespace-nowrap"
+                        className="whitespace-nowrap"
                       >
                         <SquareTerminal className="w-3.5 h-3.5" />
                         Test in Playground
-                      </button>
+                      </LiquidButton>
                     )}
-                    <button
+                    <LiquidButton
                       type="button"
+                      size="sm"
+                      variant={isSelected ? 'default' : 'outline'}
                       onClick={() => {
                         onSelectModel(m.id);
                         onNavigate('studio');
                       }}
-                      className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg transition-colors whitespace-nowrap ${
-                        isSelected
-                          ? 'border border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-400'
-                          : 'border border-slate-200 dark:border-white/[0.1] text-slate-800 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-white/[0.04]'
-                      }`}
+                      className="text-xs whitespace-nowrap"
                     >
                       {isSelected && <CheckCircle2 className="w-3.5 h-3.5" />}
                       Configure Fine-Tuning
-                    </button>
+                    </LiquidButton>
                   </div>
                 </div>
               </SpotlightCard>

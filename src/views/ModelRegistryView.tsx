@@ -8,6 +8,7 @@ import {
   Rocket,
   Trash2,
 } from 'lucide-react';
+import { LiquidButton } from '@/components/ui/liquid-glass-button';
 import { api } from '../lib/api';
 import { formatBytes, formatNumber } from '../lib/utils';
 import type { RegisteredModelRecord } from '../shared/types';
@@ -111,13 +112,14 @@ ${JSON.stringify(m.trainingConfig, null, 2)}
             Manage trained LoRA &amp; QLoRA adapters, download reproducible artifact bundles, export model cards, or deploy inference endpoints.
           </p>
         </div>
-        <button
+        <LiquidButton
           type="button"
+          variant="default"
           onClick={() => onNavigate('studio')}
-          className="px-4 py-2 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-500 shrink-0"
+          className="shrink-0"
         >
           Train New Adapter
-        </button>
+        </LiquidButton>
       </div>
 
       {error && (
@@ -253,20 +255,22 @@ ${JSON.stringify(m.trainingConfig, null, 2)}
               {JSON.stringify(selectedCard.trainingConfig, null, 2)}
             </pre>
             <div className="flex justify-end gap-2">
-              <button
+              <LiquidButton
                 type="button"
+                size="sm"
+                variant="outline"
                 onClick={() => handleExportModelCard(selectedCard)}
-                className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-white/[0.1]"
               >
                 Export README.md
-              </button>
-              <button
+              </LiquidButton>
+              <LiquidButton
                 type="button"
+                size="sm"
+                variant="default"
                 onClick={() => setSelectedCard(null)}
-                className="px-4 py-2 text-xs font-medium rounded-lg bg-blue-600 text-white"
               >
                 Close
-              </button>
+              </LiquidButton>
             </div>
           </div>
         </div>
@@ -292,13 +296,14 @@ ${JSON.stringify(m.trainingConfig, null, 2)}
   -d '{"modelRef":"reg:${deployModal.id}","prompt":"I lost my debit card"}'`}
             </pre>
             <div className="flex justify-end">
-              <button
+              <LiquidButton
                 type="button"
+                size="sm"
+                variant="default"
                 onClick={() => setDeployModal(null)}
-                className="px-4 py-2 text-xs font-medium rounded-lg bg-blue-600 text-white"
               >
                 Done
-              </button>
+              </LiquidButton>
             </div>
           </div>
         </div>

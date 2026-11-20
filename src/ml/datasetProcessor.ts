@@ -46,16 +46,37 @@ export function stableHash(input: string): string {
   return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
 }
 
+function detectCsvDelimiter(text: string): string {
+  const firstLine = text.split('\n', 1)[0] ?? '';
+  let commaCount = 0;
+  let tabCount = 0;
+  let semiCount = 0;
+  let inQuotes = false;
+  for (let i = 0; i < firstLine.length; i++) {
+    const ch = firstLine[i];
+    if (ch === '"') inQuotes = !inQuotes;
+    else if (!inQuotes) {
+      if (ch === ',') commaCount++;
+      else if (ch === '\t') tabCount++;
+      else if (ch === ';') semiCount++;
+    }
+  }
+  if (tabCount > commaCount && tabCount >= semiCount) return '\t';
+  if (semiCount > commaCount && semiCount > tabCount) return ';';
+  return ',';
+}
+
 /**
- * RFC-4180 compliant CSV parser handling quoted fields, escaped quotes, and newlines inside quotes.
+ * RFC-4180 compliant delimited parser handling quoted fields, escaped quotes, newlines inside quotes, and CSV/TSV/semicolon files.
  */
-export function parseCSV(content: string): RawRow[] {
+export function parseCSV(content: string, forcedDelimiter?: string): RawRow[] {
   const rows: string[][] = [];
   let currentRow: string[] = [];
   let currentField = '';
   let inQuotes = false;
 
-  const text = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const text = content.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const delimiter = forcedDelimiter || detectCsvDelimiter(text);
 
   for (let i = 0; i < text.length; i++) {
     const char = text[i];
@@ -73,7 +94,7 @@ export function parseCSV(content: string): RawRow[] {
     } else {
       if (char === '"') {
         inQuotes = true;
-      } else if (char === ',') {
+      } else if (char === delimiter) {
         currentRow.push(currentField);
         currentField = '';
       } else if (char === '\n') {
@@ -108,41 +129,146 @@ export function parseCSV(content: string): RawRow[] {
   });
 }
 
+const JSON_WRAPPER_KEYS = [
+  'data',
+  'rows',
+  'items',
+  'records',
+  'examples',
+  'samples',
+  'dataset',
+  'conversations',
+  'train',
+  'validation',
+  'test',
+  'messages',
+  'entries',
+  'results',
+] as const;
+
+function coerceJsonArrayToRows(arr: unknown[]): RawRow[] {
+  const rows: RawRow[] = [];
+  for (const item of arr) {
+    if (typeof item === 'object' && item !== null && !Array.isArray(item)) {
+      rows.push(item as RawRow);
+    } else if (typeof item === 'string' && item.trim().length > 0) {
+      rows.push({ text: item.trim() });
+    }
+  }
+  return rows;
+}
+
+function extractRowsFromParsedJson(parsed: unknown): RawRow[] | null {
+  if (Array.isArray(parsed)) {
+    return coerceJsonArrayToRows(parsed);
+  }
+  if (typeof parsed !== 'object' || parsed === null) {
+    return null;
+  }
+
+  const record = parsed as Record<string, unknown>;
+
+  // 1. Check standard wrapper array keys
+  for (const key of JSON_WRAPPER_KEYS) {
+    const val = record[key];
+    if (Array.isArray(val) && val.length > 0) {
+      // Special case: top-level `{ messages: [ {role, content}, ... ] }` single conversation object
+      if (
+        key === 'messages' &&
+        val.every((m) => m && typeof m === 'object' && 'role' in (m as RawRow) && 'content' in (m as RawRow))
+      ) {
+        return [record];
+      }
+      const coerced = coerceJsonArrayToRows(val);
+      if (coerced.length > 0) return coerced;
+    }
+  }
+
+  // 2. Search nested wrapper objects up to 2 levels for arrays of records
+  for (const val of Object.values(record)) {
+    if (Array.isArray(val) && val.length > 0) {
+      const coerced = coerceJsonArrayToRows(val);
+      if (coerced.length > 0) return coerced;
+    }
+  }
+  for (const val of Object.values(record)) {
+    if (val && typeof val === 'object' && !Array.isArray(val)) {
+      for (const innerVal of Object.values(val as Record<string, unknown>)) {
+        if (Array.isArray(innerVal) && innerVal.length > 0) {
+          const coerced = coerceJsonArrayToRows(innerVal);
+          if (coerced.length > 0) return coerced;
+        }
+      }
+    }
+  }
+
+  // 3. Dictionary of keyed record objects e.g. { "0": {...}, "1": {...} }
+  const values = Object.values(record);
+  if (
+    values.length >= 2 &&
+    values.every((v) => v && typeof v === 'object' && !Array.isArray(v))
+  ) {
+    return values as RawRow[];
+  }
+
+  // 4. Single JSON object record (e.g. single instruction/prompt/text item)
+  if (Object.keys(record).length > 0) {
+    return [record];
+  }
+
+  return null;
+}
+
+function parseJsonLinesText(text: string): RawRow[] {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+  return lines.map((line, index) => {
+    try {
+      const obj = JSON.parse(line);
+      if (typeof obj === 'string' && obj.trim().length > 0) {
+        return { text: obj.trim() };
+      }
+      if (typeof obj !== 'object' || obj === null || Array.isArray(obj)) {
+        throw new Error(`Line ${index + 1} is not a JSON object.`);
+      }
+      return obj as RawRow;
+    } catch (err) {
+      throw new Error(`Invalid JSONL at line ${index + 1}: ${(err as Error).message}`);
+    }
+  });
+}
+
 export function parseDatasetContent(
   content: string,
-  fileType: 'csv' | 'json' | 'jsonl' | 'txt'
+  fileType: 'csv' | 'json' | 'jsonl' | 'txt' | 'tsv' | 'ndjson'
 ): RawRow[] {
-  const trimmed = content.trim();
+  const trimmed = content.replace(/^\uFEFF/, '').trim();
   if (!trimmed) return [];
 
   if (fileType === 'csv') {
     return parseCSV(trimmed);
   }
-
-  if (fileType === 'json') {
-    const parsed = JSON.parse(trimmed);
-    if (Array.isArray(parsed)) {
-      return parsed.filter((item): item is RawRow => typeof item === 'object' && item !== null);
-    }
-    if (typeof parsed === 'object' && parsed !== null && Array.isArray((parsed as RawRow).data)) {
-      return (parsed as { data: RawRow[] }).data;
-    }
-    throw new Error('JSON dataset must be an array of objects or contain a "data" array.');
+  if (fileType === 'tsv') {
+    return parseCSV(trimmed, '\t');
   }
 
-  if (fileType === 'jsonl') {
-    const lines = trimmed.split(/\r?\n/).filter((l) => l.trim().length > 0);
-    return lines.map((line, index) => {
-      try {
-        const obj = JSON.parse(line);
-        if (typeof obj !== 'object' || obj === null) {
-          throw new Error(`Line ${index + 1} is not a JSON object.`);
-        }
-        return obj as RawRow;
-      } catch (err) {
-        throw new Error(`Invalid JSONL at line ${index + 1}: ${(err as Error).message}`);
+  if (fileType === 'json') {
+    try {
+      const parsed = JSON.parse(trimmed);
+      const extracted = extractRowsFromParsedJson(parsed);
+      if (extracted) return extracted;
+    } catch (jsonErr) {
+      // Fall back to NDJSON/JSONL when multiple JSON lines were saved with a .json extension
+      const nonEmptyLines = trimmed.split(/\r?\n/).filter((l) => l.trim().length > 0);
+      if (nonEmptyLines.length > 1 && nonEmptyLines.every((l) => l.trim().startsWith('{'))) {
+        return parseJsonLinesText(trimmed);
       }
-    });
+      throw new Error(`Invalid JSON file: ${(jsonErr as Error).message}`);
+    }
+    throw new Error('Could not find any dataset records in JSON file.');
+  }
+
+  if (fileType === 'jsonl' || fileType === 'ndjson') {
+    return parseJsonLinesText(trimmed);
   }
 
   // TXT: split by double newlines or non-empty lines into raw instruction/text records
@@ -155,18 +281,38 @@ export function parseDatasetContent(
     .map((text) => ({ text }));
 }
 
+const PROMPT_KEY_CANDIDATES = ['instruction', 'prompt', 'question', 'query', 'task', 'title'] as const;
+const INPUT_KEY_CANDIDATES = ['input', 'context', 'passage', 'document', 'user_input'] as const;
+const OUTPUT_KEY_CANDIDATES = [
+  'output',
+  'response',
+  'answer',
+  'completion',
+  'label',
+  'target',
+  'reply',
+  'category',
+  'class',
+] as const;
+
+function pickFirstMatchingKey(obj: Record<string, unknown>, candidates: readonly string[]): string | undefined {
+  return candidates.find((k) => k in obj);
+}
+
 export function detectDatasetFormat(rows: RawRow[]): DatasetFormat {
   if (rows.length === 0) return 'raw_text';
   const sample = rows[0];
-  if (Array.isArray(sample.messages)) {
+  if (Array.isArray(sample.messages) || Array.isArray(sample.conversations)) {
     return 'conversational';
   }
-  if (
-    'instruction' in sample ||
-    'output' in sample ||
-    ('prompt' in sample && 'completion' in sample) ||
-    ('input' in sample && 'label' in sample)
-  ) {
+  const hasPromptLike =
+    Boolean(pickFirstMatchingKey(sample, PROMPT_KEY_CANDIDATES)) ||
+    Boolean(pickFirstMatchingKey(sample, INPUT_KEY_CANDIDATES));
+  const hasOutputLike = Boolean(pickFirstMatchingKey(sample, OUTPUT_KEY_CANDIDATES));
+  if (hasPromptLike && hasOutputLike) {
+    return 'instruction';
+  }
+  if ('instruction' in sample || 'output' in sample) {
     return 'instruction';
   }
   return 'raw_text';
@@ -267,21 +413,34 @@ export function validateDatasetRows(
   }
 
   // Format schema checks
+  const colObj = Object.fromEntries(colNames.map((c) => [c, true]));
   if (format === 'instruction') {
-    const instKey = columnMapping?.instruction || (colNames.includes('instruction') ? 'instruction' : 'prompt');
-    const outKey = columnMapping?.output || (colNames.includes('output') ? 'output' : colNames.includes('label') ? 'label' : 'completion');
-    if (!colNames.includes(instKey) && !colNames.includes('input')) {
-      errors.push(`Instruction dataset requires an "${instKey}" or "input" column.`);
+    const instKey =
+      columnMapping?.instruction ||
+      pickFirstMatchingKey(colObj, PROMPT_KEY_CANDIDATES) ||
+      'instruction';
+    const inKey =
+      columnMapping?.input ||
+      pickFirstMatchingKey(colObj, INPUT_KEY_CANDIDATES) ||
+      'input';
+    const outKey =
+      columnMapping?.output ||
+      pickFirstMatchingKey(colObj, OUTPUT_KEY_CANDIDATES) ||
+      'output';
+    if (!colNames.includes(instKey) && !colNames.includes(inKey)) {
+      errors.push(`Instruction dataset requires an "${instKey}" or "${inKey}" column.`);
     }
     if (!colNames.includes(outKey)) {
       errors.push(`Instruction dataset requires a target "${outKey}" column.`);
     }
   } else if (format === 'conversational') {
-    const msgKey = columnMapping?.messages || 'messages';
+    const msgKey =
+      columnMapping?.messages ||
+      (colNames.includes('messages') ? 'messages' : 'conversations');
     if (!colNames.includes(msgKey)) {
       errors.push(`Conversational dataset requires a "${msgKey}" array column.`);
     }
-  } else if (!colNames.includes('text') && colNames.length === 0) {
+  } else if (colNames.length === 0) {
     errors.push('Raw text dataset must contain at least one text column.');
   }
 
@@ -316,20 +475,30 @@ export function normalizeRow(
   mapping?: { instruction?: string; input?: string; output?: string; messages?: string } | null
 ): NormalizedExample | null {
   if (format === 'conversational') {
-    const msgKey = mapping?.messages || 'messages';
+    const msgKey = mapping?.messages || ('messages' in row ? 'messages' : 'conversations');
     const rawMsgs = row[msgKey];
     if (!Array.isArray(rawMsgs) || rawMsgs.length < 2) return null;
     const cleanMsgs = rawMsgs
-      .filter((m): m is { role: 'system' | 'user' | 'assistant'; content: string } =>
-        Boolean(m && typeof m === 'object' && typeof (m as RawRow).content === 'string')
+      .filter((m): m is { role?: string; from?: string; content?: string; value?: string } =>
+        Boolean(
+          m &&
+            typeof m === 'object' &&
+            (typeof (m as RawRow).content === 'string' || typeof (m as RawRow).value === 'string')
+        )
       )
-      .map((m) => ({
-        role: (m.role === 'system' || m.role === 'assistant' ? m.role : 'user') as
-          | 'system'
-          | 'user'
-          | 'assistant',
-        content: m.content.trim(),
-      }))
+      .map((m) => {
+        const rawRole = String(m.role ?? m.from ?? 'user').toLowerCase();
+        const role: 'system' | 'user' | 'assistant' =
+          rawRole === 'system'
+            ? 'system'
+            : rawRole === 'assistant' || rawRole === 'gpt' || rawRole === 'model'
+              ? 'assistant'
+              : 'user';
+        return {
+          role,
+          content: String(m.content ?? m.value ?? '').trim(),
+        };
+      })
       .filter((m) => m.content.length > 0);
 
     const lastAssistantIdx = [...cleanMsgs].reverse().findIndex((m) => m.role === 'assistant');
@@ -352,18 +521,22 @@ export function normalizeRow(
   }
 
   if (format === 'instruction') {
-    const instKey = mapping?.instruction || ('instruction' in row ? 'instruction' : 'prompt');
-    const inKey = mapping?.input || 'input';
+    const instKey =
+      mapping?.instruction || pickFirstMatchingKey(row, PROMPT_KEY_CANDIDATES) || 'instruction';
+    const inKey =
+      mapping?.input || pickFirstMatchingKey(row, INPUT_KEY_CANDIDATES) || 'input';
     const outKey =
-      mapping?.output ||
-      ('output' in row ? 'output' : 'label' in row ? 'label' : 'completion');
+      mapping?.output || pickFirstMatchingKey(row, OUTPUT_KEY_CANDIDATES) || 'output';
 
     const instruction = String(row[instKey] ?? '').trim();
     const input = String(row[inKey] ?? '').trim();
     const targetText = String(row[outKey] ?? '').trim();
 
     if ((!instruction && !input) || !targetText) return null;
-    const promptText = input ? `${instruction}\nInput: ${input}`.trim() : instruction;
+    const promptText =
+      input && input !== instruction
+        ? `${instruction}\nInput: ${input}`.trim()
+        : instruction || input;
 
     return {
       id: `ex_${index}`,
@@ -376,8 +549,24 @@ export function normalizeRow(
   }
 
   // raw_text
-  const firstCol = Object.keys(row)[0] || 'text';
-  const text = String(row.text ?? row[firstCol] ?? '').trim();
+  const textCol =
+    (typeof row.text === 'string' && 'text') ||
+    (typeof row.content === 'string' && 'content') ||
+    (typeof row.body === 'string' && 'body') ||
+    (typeof row.document === 'string' && 'document') ||
+    (typeof row.sentence === 'string' && 'sentence') ||
+    Object.keys(row)[0] ||
+    'text';
+  const rawVal = row[textCol];
+  const text =
+    typeof rawVal === 'string'
+      ? rawVal.trim()
+      : rawVal !== null && rawVal !== undefined
+        ? JSON.stringify(rawVal)
+        : Object.values(row)
+            .filter((v) => v !== null && v !== undefined && String(v).trim() !== '')
+            .map((v) => (typeof v === 'string' ? v.trim() : JSON.stringify(v)))
+            .join(' ');
   if (!text) return null;
   const splitIdx = Math.max(1, Math.floor(text.length * 0.65));
   const promptText = text.slice(0, splitIdx).trim();

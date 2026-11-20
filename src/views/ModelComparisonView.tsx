@@ -11,12 +11,36 @@ import {
   YAxis,
 } from 'recharts';
 import { LatticeLoader } from '../components/reactbits/LatticeLoader';
+import { LiquidButton } from '@/components/ui/liquid-glass-button';
 import { api } from '../lib/api';
 import { formatBytes, formatDuration, formatNumber } from '../lib/utils';
-import type { DatasetRecord, EvaluationRunRecord } from '../shared/types';
+import type { ComparisonModelMeta, DatasetRecord, EvaluationRunRecord } from '../shared/types';
+
+const MODEL_GROUPS = [
+  'Trained Adapter',
+  'NVIDIA NIM',
+  'Z.ai',
+  'ChatGPT',
+  'Claude',
+  'Gemini',
+  'DeepSeek',
+  'Open SLM',
+  'Llama',
+  'Mistral',
+];
+
+function formatDeltaPts(a: number, b: number, higherIsBetter = true): { text: string; tone: string } {
+  const diff = b - a;
+  if (Math.abs(diff) < 0.05) return { text: '0.0', tone: 'text-slate-400' };
+  const improved = higherIsBetter ? diff > 0 : diff < 0;
+  return {
+    text: `${diff > 0 ? '+' : ''}${diff.toFixed(1)}`,
+    tone: improved ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400',
+  };
+}
 
 export function ModelComparisonView() {
-  const [models, setModels] = useState<Array<{ ref: string; label: string }>>([]);
+  const [models, setModels] = useState<Array<{ ref: string; label: string; aiTool?: string }>>([]);
   const [datasets, setDatasets] = useState<DatasetRecord[]>([]);
   const [leftRef, setLeftRef] = useState('');
   const [rightRef, setRightRef] = useState('');
@@ -26,21 +50,11 @@ export function ModelComparisonView() {
   const [comparison, setComparison] = useState<{
     left: {
       evaluation: EvaluationRunRecord;
-      meta: {
-        durationMs: number;
-        adapterSizeBytes: number;
-        trainableParams: number;
-        estimatedMemoryGb: number;
-      };
+      meta: ComparisonModelMeta;
     };
     right: {
       evaluation: EvaluationRunRecord;
-      meta: {
-        durationMs: number;
-        adapterSizeBytes: number;
-        trainableParams: number;
-        estimatedMemoryGb: number;
-      };
+      meta: ComparisonModelMeta;
     };
     sampleDiffs: Array<{
       index: number;
@@ -56,18 +70,24 @@ export function ModelComparisonView() {
   } | null>(null);
 
   useEffect(() => {
-    Promise.all([api.getInferenceModels(), api.getDatasets()]).then(([mRes, dsList]) => {
-      setModels(mRes.models);
-      const ready = dsList.filter((d) => d.status === 'training_ready');
-      setDatasets(ready);
-      const baseDefault = mRes.models.find((m) => m.ref.startsWith('base:'))?.ref || mRes.models[0]?.ref || '';
-      const tunedDefault = mRes.models.find((m) => m.ref.startsWith('reg:'))?.ref || mRes.models[1]?.ref || baseDefault;
-      setLeftRef(baseDefault);
-      setRightRef(tunedDefault);
-      if (ready.length > 0) setDatasetId(ready[0].id);
-    }).catch((err) => {
-      setError((err as Error).message);
-    });
+    Promise.all([api.getInferenceModels(), api.getDatasets()])
+      .then(([mRes, dsList]) => {
+        setModels(mRes.models);
+        const ready = dsList.filter((d) => d.status === 'training_ready');
+        setDatasets(ready);
+        const baseDefault =
+          mRes.models.find((m) => m.ref.startsWith('base:'))?.ref || mRes.models[0]?.ref || '';
+        const tunedDefault =
+          mRes.models.find((m) => m.ref.startsWith('reg:'))?.ref ||
+          mRes.models.find((m) => m.ref !== baseDefault)?.ref ||
+          baseDefault;
+        setLeftRef(baseDefault);
+        setRightRef(tunedDefault);
+        if (ready.length > 0) setDatasetId(ready[0].id);
+      })
+      .catch((err) => {
+        setError((err as Error).message);
+      });
   }, []);
 
   const handleCompare = async () => {
@@ -83,6 +103,21 @@ export function ModelComparisonView() {
       setRunning(false);
     }
   };
+
+  const renderGroupedOptions = () =>
+    MODEL_GROUPS.map((group) => {
+      const items = models.filter((m) => (m.aiTool ?? 'Open SLM') === group);
+      if (items.length === 0) return null;
+      return (
+        <optgroup key={group} label={group}>
+          {items.map((m) => (
+            <option key={m.ref} value={m.ref}>
+              {m.label}
+            </option>
+          ))}
+        </optgroup>
+      );
+    });
 
   const chartData = comparison
     ? [
@@ -120,8 +155,38 @@ export function ModelComparisonView() {
             ).toFixed(1)
           ),
         },
+        {
+          metric: 'Confidence %',
+          Left: Number(
+            (
+              (comparison.left.evaluation.samples.reduce((s, x) => s + x.confidence, 0) /
+                Math.max(1, comparison.left.evaluation.samples.length)) *
+              100
+            ).toFixed(1)
+          ),
+          Right: Number(
+            (
+              (comparison.right.evaluation.samples.reduce((s, x) => s + x.confidence, 0) /
+                Math.max(1, comparison.right.evaluation.samples.length)) *
+              100
+            ).toFixed(1)
+          ),
+        },
       ]
     : [];
+
+  const leftAccPct = comparison
+    ? ((comparison.left.evaluation.accuracy ?? comparison.left.evaluation.exactMatch ?? 0) * 100)
+    : 0;
+  const rightAccPct = comparison
+    ? ((comparison.right.evaluation.accuracy ?? comparison.right.evaluation.exactMatch ?? 0) * 100)
+    : 0;
+  const leftF1Pct = comparison
+    ? ((comparison.left.evaluation.macroF1 ?? comparison.left.evaluation.tokenF1 ?? 0) * 100)
+    : 0;
+  const rightF1Pct = comparison
+    ? ((comparison.right.evaluation.macroF1 ?? comparison.right.evaluation.tokenF1 ?? 0) * 100)
+    : 0;
 
   return (
     <div className="space-y-6">
@@ -130,7 +195,7 @@ export function ModelComparisonView() {
           Model Comparison
         </h1>
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          Run paired side-by-side benchmarks comparing Base vs LoRA, Base vs QLoRA, or LoRA vs QLoRA on identical test inputs.
+          Run deterministic side-by-side benchmarks across Base Models, NVIDIA NIM, Z.ai GLM, Frontier APIs, and LoRA/QLoRA Adapters with real accuracy and memory footprint deltas.
         </p>
       </div>
 
@@ -140,15 +205,12 @@ export function ModelComparisonView() {
             Baseline / Model A
           </label>
           <select
+            aria-label="Baseline or Model A"
             value={leftRef}
             onChange={(e) => setLeftRef(e.target.value)}
             className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-white/[0.1] bg-slate-50 dark:bg-[#090B10]"
           >
-            {models.map((m) => (
-              <option key={m.ref} value={m.ref}>
-                {m.label}
-              </option>
-            ))}
+            {renderGroupedOptions()}
           </select>
         </div>
         <div>
@@ -156,15 +218,12 @@ export function ModelComparisonView() {
             Candidate / Model B
           </label>
           <select
+            aria-label="Candidate or Model B"
             value={rightRef}
             onChange={(e) => setRightRef(e.target.value)}
             className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-white/[0.1] bg-slate-50 dark:bg-[#090B10]"
           >
-            {models.map((m) => (
-              <option key={m.ref} value={m.ref}>
-                {m.label}
-              </option>
-            ))}
+            {renderGroupedOptions()}
           </select>
         </div>
         <div>
@@ -172,26 +231,28 @@ export function ModelComparisonView() {
             Held-Out Test Dataset
           </label>
           <select
+            aria-label="Held-Out Test Dataset"
             value={datasetId}
             onChange={(e) => setDatasetId(e.target.value)}
             className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-white/[0.1] bg-slate-50 dark:bg-[#090B10]"
           >
             {datasets.map((d) => (
               <option key={d.id} value={d.id}>
-                {d.name}
+                {d.name} ({d.splits?.testCount ?? 0} test rows)
               </option>
             ))}
           </select>
         </div>
-        <button
+        <LiquidButton
           type="button"
+          variant="default"
           disabled={running || !leftRef || !rightRef || !datasetId}
           onClick={handleCompare}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50"
+          className="w-full justify-center"
         >
           <Play className="w-3.5 h-3.5" />
           {running ? 'Comparing...' : 'Run Comparison'}
-        </button>
+        </LiquidButton>
       </div>
 
       {running && (
@@ -211,7 +272,7 @@ export function ModelComparisonView() {
       )}
 
       {error && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-red-600 dark:text-red-400 flex items-center gap-2">
+        <div className="rounded-lg border border-red-500/35 bg-red-50/95 dark:bg-[#220F14]/95 backdrop-blur-md px-4 py-3 text-xs text-red-700 dark:text-red-300 flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           <span>{error}</span>
         </div>
@@ -227,11 +288,11 @@ export function ModelComparisonView() {
       ) : (
         <>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-6 rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] p-5">
+            <div className="lg:col-span-5 rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] p-5">
               <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">
                 Metric Comparison Chart
               </h2>
-              <div className="h-64">
+              <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.14)" />
@@ -268,64 +329,178 @@ export function ModelComparisonView() {
               </div>
             </div>
 
-            <div className="lg:col-span-6 rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] overflow-hidden">
-              <div className="px-5 py-3 border-b border-slate-200 dark:border-white/[0.08] text-xs font-semibold">
-                Measured Metrics &amp; Footprint
+            <div className="lg:col-span-7 rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] overflow-hidden">
+              <div className="px-5 py-3 border-b border-slate-200 dark:border-white/[0.08] flex items-center justify-between text-xs font-semibold">
+                <span>Measured Metrics &amp; Footprint</span>
+                <span className="font-mono font-normal text-slate-500">
+                  {comparison.left.evaluation.testSampleCount} held-out test samples
+                </span>
               </div>
-              <table className="w-full text-left text-xs font-mono tabular-nums">
-                <thead className="border-b border-slate-200 dark:border-white/[0.06] text-slate-500">
-                  <tr>
-                    <th className="py-2.5 px-4 font-medium">Dimension</th>
-                    <th className="py-2.5 px-4 font-medium text-right">Model A</th>
-                    <th className="py-2.5 px-4 font-medium text-right">Model B</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 dark:divide-white/[0.06]">
-                  <tr>
-                    <td className="py-2 px-4 text-slate-500">Accuracy / Exact Match</td>
-                    <td className="py-2 px-4 text-right">
-                      {(((comparison.left.evaluation.accuracy ?? comparison.left.evaluation.exactMatch) ?? 0) * 100).toFixed(1)}%
-                    </td>
-                    <td className="py-2 px-4 text-right font-semibold text-blue-600 dark:text-blue-400">
-                      {(((comparison.right.evaluation.accuracy ?? comparison.right.evaluation.exactMatch) ?? 0) * 100).toFixed(1)}%
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="py-2 px-4 text-slate-500">Macro F1 / Token F1</td>
-                    <td className="py-2 px-4 text-right">
-                      {(((comparison.left.evaluation.macroF1 ?? comparison.left.evaluation.tokenF1) ?? 0) * 100).toFixed(1)}%
-                    </td>
-                    <td className="py-2 px-4 text-right">
-                      {(((comparison.right.evaluation.macroF1 ?? comparison.right.evaluation.tokenF1) ?? 0) * 100).toFixed(1)}%
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="py-2 px-4 text-slate-500">Perplexity</td>
-                    <td className="py-2 px-4 text-right">{comparison.left.evaluation.perplexity}</td>
-                    <td className="py-2 px-4 text-right">{comparison.right.evaluation.perplexity}</td>
-                  </tr>
-                  <tr>
-                    <td className="py-2 px-4 text-slate-500">Inference Latency</td>
-                    <td className="py-2 px-4 text-right">{comparison.left.evaluation.avgLatencyMs} ms</td>
-                    <td className="py-2 px-4 text-right">{comparison.right.evaluation.avgLatencyMs} ms</td>
-                  </tr>
-                  <tr>
-                    <td className="py-2 px-4 text-slate-500">Training Duration</td>
-                    <td className="py-2 px-4 text-right">{formatDuration(comparison.left.meta.durationMs)}</td>
-                    <td className="py-2 px-4 text-right">{formatDuration(comparison.right.meta.durationMs)}</td>
-                  </tr>
-                  <tr>
-                    <td className="py-2 px-4 text-slate-500">Adapter Size</td>
-                    <td className="py-2 px-4 text-right">{formatBytes(comparison.left.meta.adapterSizeBytes)}</td>
-                    <td className="py-2 px-4 text-right">{formatBytes(comparison.right.meta.adapterSizeBytes)}</td>
-                  </tr>
-                  <tr>
-                    <td className="py-2 px-4 text-slate-500">Trainable Params</td>
-                    <td className="py-2 px-4 text-right">{formatNumber(comparison.left.meta.trainableParams)}</td>
-                    <td className="py-2 px-4 text-right">{formatNumber(comparison.right.meta.trainableParams)}</td>
-                  </tr>
-                </tbody>
-              </table>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs font-mono tabular-nums">
+                  <thead className="border-b border-slate-200 dark:border-white/[0.06] text-slate-500">
+                    <tr>
+                      <th className="py-2.5 px-4 font-medium">Dimension</th>
+                      <th className="py-2.5 px-3 font-medium text-right max-w-[140px] truncate" title={comparison.left.evaluation.modelName}>
+                        Model A
+                      </th>
+                      <th className="py-2.5 px-3 font-medium text-right max-w-[140px] truncate" title={comparison.right.evaluation.modelName}>
+                        Model B
+                      </th>
+                      <th className="py-2.5 px-4 font-medium text-right">Delta (B-A)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 dark:divide-white/[0.06]">
+                    <tr>
+                      <td className="py-2 px-4 text-slate-500 font-sans">Accuracy / Exact Match</td>
+                      <td className="py-2 px-3 text-right">{leftAccPct.toFixed(1)}%</td>
+                      <td className="py-2 px-3 text-right font-semibold text-blue-600 dark:text-blue-400">
+                        {rightAccPct.toFixed(1)}%
+                      </td>
+                      <td className={`py-2 px-4 text-right ${formatDeltaPts(leftAccPct, rightAccPct, true).tone}`}>
+                        {formatDeltaPts(leftAccPct, rightAccPct, true).text}%
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-4 text-slate-500 font-sans">Macro F1 / Token F1</td>
+                      <td className="py-2 px-3 text-right">{leftF1Pct.toFixed(1)}%</td>
+                      <td className="py-2 px-3 text-right">{rightF1Pct.toFixed(1)}%</td>
+                      <td className={`py-2 px-4 text-right ${formatDeltaPts(leftF1Pct, rightF1Pct, true).tone}`}>
+                        {formatDeltaPts(leftF1Pct, rightF1Pct, true).text}%
+                      </td>
+                    </tr>
+                    {comparison.left.evaluation.precision !== null && (
+                      <tr>
+                        <td className="py-2 px-4 text-slate-500 font-sans">Precision / Recall</td>
+                        <td className="py-2 px-3 text-right">
+                          {((comparison.left.evaluation.precision ?? 0) * 100).toFixed(1)}% /{' '}
+                          {((comparison.left.evaluation.recall ?? 0) * 100).toFixed(1)}%
+                        </td>
+                        <td className="py-2 px-3 text-right">
+                          {((comparison.right.evaluation.precision ?? 0) * 100).toFixed(1)}% /{' '}
+                          {((comparison.right.evaluation.recall ?? 0) * 100).toFixed(1)}%
+                        </td>
+                        <td className="py-2 px-4 text-right text-slate-400">—</td>
+                      </tr>
+                    )}
+                    <tr>
+                      <td className="py-2 px-4 text-slate-500 font-sans">Perplexity</td>
+                      <td className="py-2 px-3 text-right">{comparison.left.evaluation.perplexity}</td>
+                      <td className="py-2 px-3 text-right">{comparison.right.evaluation.perplexity}</td>
+                      <td
+                        className={`py-2 px-4 text-right ${
+                          formatDeltaPts(
+                            comparison.left.evaluation.perplexity,
+                            comparison.right.evaluation.perplexity,
+                            false
+                          ).tone
+                        }`}
+                      >
+                        {formatDeltaPts(
+                          comparison.left.evaluation.perplexity,
+                          comparison.right.evaluation.perplexity,
+                          false
+                        ).text}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-4 text-slate-500 font-sans">Avg Test Loss</td>
+                      <td className="py-2 px-3 text-right">{comparison.left.evaluation.avgLoss.toFixed(4)}</td>
+                      <td className="py-2 px-3 text-right">{comparison.right.evaluation.avgLoss.toFixed(4)}</td>
+                      <td
+                        className={`py-2 px-4 text-right ${
+                          comparison.right.evaluation.avgLoss <= comparison.left.evaluation.avgLoss
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : 'text-amber-600 dark:text-amber-400'
+                        }`}
+                      >
+                        {(comparison.right.evaluation.avgLoss - comparison.left.evaluation.avgLoss > 0 ? '+' : '')}
+                        {(comparison.right.evaluation.avgLoss - comparison.left.evaluation.avgLoss).toFixed(3)}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-4 text-slate-500 font-sans">Inference Latency</td>
+                      <td className="py-2 px-3 text-right">{comparison.left.evaluation.avgLatencyMs} ms</td>
+                      <td className="py-2 px-3 text-right">{comparison.right.evaluation.avgLatencyMs} ms</td>
+                      <td
+                        className={`py-2 px-4 text-right ${
+                          formatDeltaPts(
+                            comparison.left.evaluation.avgLatencyMs,
+                            comparison.right.evaluation.avgLatencyMs,
+                            false
+                          ).tone
+                        }`}
+                      >
+                        {formatDeltaPts(
+                          comparison.left.evaluation.avgLatencyMs,
+                          comparison.right.evaluation.avgLatencyMs,
+                          false
+                        ).text} ms
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-4 text-slate-500 font-sans">Training Duration</td>
+                      <td className="py-2 px-3 text-right">{formatDuration(comparison.left.meta.durationMs)}</td>
+                      <td className="py-2 px-3 text-right">{formatDuration(comparison.right.meta.durationMs)}</td>
+                      <td className="py-2 px-4 text-right text-slate-400">—</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-4 text-slate-500 font-sans">Adapter Size</td>
+                      <td className="py-2 px-3 text-right">{formatBytes(comparison.left.meta.adapterSizeBytes)}</td>
+                      <td className="py-2 px-3 text-right">{formatBytes(comparison.right.meta.adapterSizeBytes)}</td>
+                      <td className="py-2 px-4 text-right text-slate-400">—</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-4 text-slate-500 font-sans">Trainable Params</td>
+                      <td className="py-2 px-3 text-right">{formatNumber(comparison.left.meta.trainableParams)}</td>
+                      <td className="py-2 px-3 text-right">{formatNumber(comparison.right.meta.trainableParams)}</td>
+                      <td className="py-2 px-4 text-right text-slate-400">—</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-4 text-slate-500 font-sans">Total Architecture Params</td>
+                      <td className="py-2 px-3 text-right">
+                        {comparison.left.meta.parameterCountLabel || formatNumber(comparison.left.meta.totalParams)}
+                      </td>
+                      <td className="py-2 px-3 text-right">
+                        {comparison.right.meta.parameterCountLabel || formatNumber(comparison.right.meta.totalParams)}
+                      </td>
+                      <td className="py-2 px-4 text-right text-slate-400">—</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-4 text-slate-500 font-sans">VRAM / Memory Footprint</td>
+                      <td className="py-2 px-3 text-right">{comparison.left.meta.estimatedMemoryGb} GB</td>
+                      <td className="py-2 px-3 text-right">{comparison.right.meta.estimatedMemoryGb} GB</td>
+                      <td
+                        className={`py-2 px-4 text-right ${
+                          formatDeltaPts(
+                            comparison.left.meta.estimatedMemoryGb,
+                            comparison.right.meta.estimatedMemoryGb,
+                            false
+                          ).tone
+                        }`}
+                      >
+                        {formatDeltaPts(
+                          comparison.left.meta.estimatedMemoryGb,
+                          comparison.right.meta.estimatedMemoryGb,
+                          false
+                        ).text} GB
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-4 text-slate-500 font-sans">Precision &amp; Context</td>
+                      <td className="py-2 px-3 text-right">
+                        {comparison.left.meta.precision} · {formatNumber(comparison.left.meta.contextLength)}
+                      </td>
+                      <td className="py-2 px-3 text-right">
+                        {comparison.right.meta.precision} · {formatNumber(comparison.right.meta.contextLength)}
+                      </td>
+                      <td className="py-2 px-4 text-right text-slate-400 uppercase">
+                        {comparison.left.meta.architecture} / {comparison.right.meta.architecture}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
 
@@ -353,14 +528,20 @@ export function ModelComparisonView() {
                           row.leftCorrect ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'
                         }`}
                       >
-                        {row.leftPrediction}
+                        {row.leftPrediction}{' '}
+                        <span className="text-[10px] text-slate-400">
+                          ({(row.leftConfidence * 100).toFixed(0)}%)
+                        </span>
                       </td>
                       <td
                         className={`py-2 px-4 font-mono ${
                           row.rightCorrect ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'
                         }`}
                       >
-                        {row.rightPrediction}
+                        {row.rightPrediction}{' '}
+                        <span className="text-[10px] text-slate-400">
+                          ({(row.rightConfidence * 100).toFixed(0)}%)
+                        </span>
                       </td>
                     </tr>
                   ))}
@@ -373,3 +554,4 @@ export function ModelComparisonView() {
     </div>
   );
 }
+

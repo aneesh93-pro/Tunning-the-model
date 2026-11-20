@@ -34,8 +34,13 @@ import {
   type RawRow,
 } from '../src/ml/datasetProcessor.ts';
 import { buildEngineForDataset } from '../src/ml/loraEngine.ts';
+import {
+  computeBaseModelComparisonMeta,
+  evaluateBaseModelOnBundle,
+} from '../src/ml/evaluationEngine.ts';
 import { getModelById, PRETRAINED_MODELS } from '../src/ml/modelCatalog.ts';
 import type {
+  ComparisonModelMeta,
   DatasetRecord,
   EvaluationRunRecord,
   RegisteredModelRecord,
@@ -43,7 +48,7 @@ import type {
   TrainingMetricPoint,
 } from '../src/shared/types.ts';
 
-const ALLOWED_EXTS = new Set(['csv', 'json', 'jsonl', 'txt']);
+const ALLOWED_EXTS = new Set(['csv', 'json', 'jsonl', 'txt', 'tsv', 'ndjson']);
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB limit
@@ -204,38 +209,9 @@ function evaluateModelAgainstTestSet(modelRef: string, datasetId: string): Evalu
     if (!spec) throw new Error(`Base model "${rawId}" not found.`);
     baseModelId = spec.id;
     modelName = `${spec.name} (Frozen Base)`;
-    const dummyConfig: TrainingConfig = {
-      experimentName: 'base-eval',
-      description: '',
-      datasetId,
-      modelId: spec.id,
-      method: 'lora',
-      loraR: 8,
-      loraAlpha: 16,
-      loraDropout: 0,
-      targetModules: spec.targetModules.slice(0, 2),
-      bias: 'none',
-      quantizationBits: 16,
-      quantType: 'nf4',
-      doubleQuant: false,
-      computeDtype: 'float32',
-      gradientCheckpointing: false,
-      learningRate: 0.001,
-      epochs: 1,
-      batchSize: 4,
-      gradientAccumulation: 1,
-      maxSeqLength: 256,
-      weightDecay: 0,
-      warmupRatio: 0,
-      optimizer: 'adamw',
-      scheduler: 'cosine',
-      earlyStoppingPatience: 3,
-      seed: 42,
-    };
-    const allExamples = [...bundle.train, ...bundle.validation, ...bundle.test];
-    const baseEngine = buildEngineForDataset(allExamples, dummyConfig, spec.chatTemplate);
-    taskType = baseEngine.taskType;
-    result = baseEngine.evaluateTestSet(bundle.test, false);
+    const baseResult = evaluateBaseModelOnBundle(spec, bundle);
+    taskType = baseResult.taskType;
+    result = baseResult;
   } else {
     const regId = modelRef.replace(/^reg:/, '');
     const regRow = db
@@ -315,6 +291,10 @@ export function createApiRouter() {
     });
   });
 
+  router.get('/hardware', (_req, res) => {
+    res.json(getHardwareTelemetry());
+  });
+
   // --- OVERVIEW & HARDWARE ---
   router.get('/overview', (_req, res) => {
     const experiments = listExperiments();
@@ -392,7 +372,7 @@ export function createApiRouter() {
 
       const ext = (fileName.split('.').pop() || '').toLowerCase();
       if (!ALLOWED_EXTS.has(ext)) {
-        res.status(400).json({ error: `Unsupported file type ".${ext}". Allowed: CSV, JSON, JSONL, TXT.` });
+        res.status(400).json({ error: `Unsupported file type ".${ext}". Allowed: CSV, TSV, JSON, JSONL, NDJSON, TXT.` });
         return;
       }
       const fileType = ext as DatasetRecord['fileType'];
@@ -1073,14 +1053,22 @@ export function createApiRouter() {
       const leftEval = evaluateModelAgainstTestSet(leftModelRef, datasetId);
       const rightEval = evaluateModelAgainstTestSet(rightModelRef, datasetId);
 
-      const getMeta = (ref: string) => {
+      const getMeta = (ref: string): ComparisonModelMeta => {
         if (ref.startsWith('base:')) {
           const spec = getModelById(ref.replace(/^base:/, ''));
+          if (spec) {
+            return computeBaseModelComparisonMeta(spec);
+          }
           return {
             durationMs: 0,
             adapterSizeBytes: 0,
             trainableParams: 0,
-            estimatedMemoryGb: spec?.estimatedFp16MemoryGb ?? 1.8,
+            totalParams: 0,
+            estimatedMemoryGb: 1.8,
+            precision: 'BF16',
+            architecture: 'transformer',
+            contextLength: 8192,
+            parameterCountLabel: 'Base',
           };
         }
         const regId = ref.replace(/^reg:/, '');
@@ -1089,14 +1077,20 @@ export function createApiRouter() {
           .get(regId) as Record<string, unknown> | undefined;
         const exp = reg ? getExperimentById(String(reg.experiment_id)) : null;
         const spec = reg ? getModelById(String(reg.base_model_id)) : null;
+        const methodStr = String(reg?.method ?? 'lora');
         return {
           durationMs: exp?.durationMs ?? 0,
           adapterSizeBytes: Number(reg?.adapter_size_bytes ?? 0),
           trainableParams: Number(reg?.trainable_params ?? 0),
+          totalParams: spec ? Math.round(spec.parameterBillions * 1e9) : (exp?.totalParams ?? 0),
           estimatedMemoryGb:
-            reg?.method === 'qlora'
+            methodStr === 'qlora'
               ? spec?.estimatedQloraMemoryGb ?? 0.9
               : spec?.estimatedFp16MemoryGb ?? 2.4,
+          precision: methodStr === 'qlora' ? 'NF4 + LoRA' : 'BF16 + LoRA',
+          architecture: spec?.architecture ?? 'lora',
+          contextLength: spec?.contextLength ?? 32768,
+          parameterCountLabel: spec?.parameterCount ?? 'Adapter',
         };
       };
 

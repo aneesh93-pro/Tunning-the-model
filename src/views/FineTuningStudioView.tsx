@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Cpu, Layers, Play, ShieldAlert } from 'lucide-react';
 import { RubberSegment } from '../components/reactbits/RubberSegment';
-import { StarBorder } from '../components/reactbits/StarBorder';
+import { LiquidButton } from '@/components/ui/liquid-glass-button';
 import { api } from '../lib/api';
 import { useIsDark } from '../lib/useDarkMode';
 import { estimateTrainingMemory, getModelById, PRETRAINED_MODELS } from '../ml/modelCatalog';
-import { formatNumber } from '../lib/utils';
+import { formatDuration, formatNumber } from '../lib/utils';
 import type {
   DatasetRecord,
   HardwareTelemetry,
@@ -68,18 +68,28 @@ export function FineTuningStudioView({
   const [seed, setSeed] = useState(42);
 
   useEffect(() => {
-    Promise.all([api.getDatasets(), api.getAvailableModels()]).then(([ds, avail]) => {
-      setDatasets(ds);
-      setHardware(avail.hardware);
-      const ready = ds.filter((d) => d.status === 'training_ready');
-      if (!datasetId && ready.length > 0) {
-        setDatasetId(ready[0].id);
-      } else if (!datasetId && ds.length > 0) {
-        setDatasetId(ds[0].id);
-      }
-    }).catch((err) => {
-      setError((err as Error).message);
-    });
+    Promise.all([api.getDatasets(), api.getAvailableModels()])
+      .then(([ds, avail]) => {
+        setDatasets(ds);
+        setHardware(avail.hardware);
+        const ready = ds.filter((d) => d.status === 'training_ready');
+        if (!datasetId && ready.length > 0) {
+          setDatasetId(ready[0].id);
+        } else if (!datasetId && ds.length > 0) {
+          setDatasetId(ds[0].id);
+        }
+      })
+      .catch((err) => {
+        setError((err as Error).message);
+      });
+
+    const hwInterval = window.setInterval(() => {
+      api
+        .getHardware()
+        .then(setHardware)
+        .catch(() => undefined);
+    }, 5000);
+    return () => window.clearInterval(hwInterval);
   }, []);
 
   useEffect(() => {
@@ -121,6 +131,18 @@ export function FineTuningStudioView({
   );
 
   const selectedDataset = datasets.find((d) => d.id === datasetId);
+
+  const scheduleEstimate = useMemo(() => {
+    const trainRows = selectedDataset?.splits?.trainCount ?? selectedDataset?.rowCount ?? 12;
+    const effectiveBatch = Math.max(1, batchSize * Math.max(1, gradientAccumulation));
+    const stepsPerEpoch = Math.max(1, Math.ceil(trainRows / effectiveBatch));
+    const totalSteps = stepsPerEpoch * Math.max(1, epochs);
+    const msPerStep =
+      (method === 'qlora' ? 210 : method === 'full' ? 285 : 165) *
+      Math.max(1, Math.log2(modelSpec.parameterBillions + 1.5) * 0.55);
+    const estimatedRuntimeMs = Math.round(totalSteps * msPerStep);
+    return { trainRows, stepsPerEpoch, totalSteps, estimatedRuntimeMs };
+  }, [selectedDataset, batchSize, gradientAccumulation, epochs, method, modelSpec.parameterBillions]);
 
   const toggleModule = (mod: string) => {
     setTargetModules((prev) =>
@@ -182,9 +204,10 @@ export function FineTuningStudioView({
             Configure LoRA, 4-bit NF4 QLoRA, optimizer schedules, and hardware memory constraints before launching training.
           </p>
         </div>
-        <StarBorder
-          as="button"
+        <LiquidButton
           type="button"
+          variant="default"
+          size="lg"
           onClick={() => {
             if (!datasetId) {
               setError('Select a preprocessed dataset first.');
@@ -211,17 +234,11 @@ export function FineTuningStudioView({
             setError(null);
             setShowConfirm(true);
           }}
-          color="#60A5FA"
-          trailColor="#06B6D4"
-          radius={8}
-          backgroundColor="#2563EB"
-          textColor="#FFFFFF"
-          borderColor="rgba(59,130,246,0.65)"
-          className="text-xs font-medium hover:brightness-110 shrink-0 whitespace-nowrap"
+          className="shrink-0 whitespace-nowrap"
         >
           <Play className="w-3.5 h-3.5" />
           Start Training
-        </StarBorder>
+        </LiquidButton>
       </div>
 
       {error && (
@@ -278,14 +295,32 @@ export function FineTuningStudioView({
                   className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-white/[0.1] bg-slate-50 dark:bg-[#090B10]"
                 >
                   <optgroup label="Recommended Local CPU / QLoRA SLMs">
-                    {PRETRAINED_MODELS.filter((m) => m.trainableLocally !== false).map((m) => (
+                    {PRETRAINED_MODELS.filter(
+                      (m) => m.trainableLocally !== false && m.aiTool !== 'NVIDIA NIM' && m.aiTool !== 'Z.ai'
+                    ).map((m) => (
                       <option key={m.id} value={m.id}>
                         {m.name} ({m.parameterCount})
                       </option>
                     ))}
                   </optgroup>
+                  <optgroup label="NVIDIA NIM Models">
+                    {PRETRAINED_MODELS.filter((m) => m.aiTool === 'NVIDIA NIM').map((m) => (
+                      <option key={m.id} value={m.id}>
+                        [NVIDIA NIM] {m.name} ({m.parameterCount})
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Z.ai (GLM) Models">
+                    {PRETRAINED_MODELS.filter((m) => m.aiTool === 'Z.ai').map((m) => (
+                      <option key={m.id} value={m.id}>
+                        [Z.ai] {m.name} ({m.parameterCount})
+                      </option>
+                    ))}
+                  </optgroup>
                   <optgroup label="Frontier & Open-Weight Architectures">
-                    {PRETRAINED_MODELS.filter((m) => m.trainableLocally === false).map((m) => (
+                    {PRETRAINED_MODELS.filter(
+                      (m) => m.trainableLocally === false && m.aiTool !== 'NVIDIA NIM' && m.aiTool !== 'Z.ai'
+                    ).map((m) => (
                       <option key={m.id} value={m.id}>
                         [{m.aiTool ?? m.source}] {m.name} ({m.parameterCount})
                       </option>
@@ -732,6 +767,26 @@ export function FineTuningStudioView({
                   {loraR} / {loraAlpha}
                 </dd>
               </div>
+              <div className="flex justify-between">
+                <dt className="text-slate-500">Estimated Steps</dt>
+                <dd className="font-mono tabular-nums">
+                  {scheduleEstimate.totalSteps} steps ({scheduleEstimate.stepsPerEpoch}/epoch)
+                </dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-slate-500">Estimated Runtime</dt>
+                <dd className="font-mono tabular-nums text-blue-600 dark:text-blue-400">
+                  ~{formatDuration(scheduleEstimate.estimatedRuntimeMs)}
+                </dd>
+              </div>
+              {hardware && (
+                <div className="flex justify-between">
+                  <dt className="text-slate-500">Live Free RAM / RSS</dt>
+                  <dd className="font-mono tabular-nums">
+                    {hardware.freeMemoryGb} GB free · {hardware.processMemoryMb} MB
+                  </dd>
+                </div>
+              )}
             </dl>
           </div>
         </div>
@@ -764,14 +819,14 @@ export function FineTuningStudioView({
               >
                 Cancel
               </button>
-              <button
+              <LiquidButton
                 type="button"
+                variant="default"
                 disabled={submitting}
                 onClick={handleLaunch}
-                className="px-4 py-2 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-500"
               >
                 {submitting ? 'Launching...' : 'Confirm & Start Training'}
-              </button>
+              </LiquidButton>
             </div>
           </div>
         </div>

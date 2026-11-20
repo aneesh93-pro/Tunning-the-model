@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { AlertTriangle, Key, Shield, Trash2 } from 'lucide-react';
 import { RubberSegment } from '../components/reactbits/RubberSegment';
+import { LiquidButton } from '@/components/ui/liquid-glass-button';
 import { api } from '../lib/api';
 import { useIsDark } from '../lib/useDarkMode';
 import type { HardwareTelemetry } from '../shared/types';
@@ -59,6 +60,13 @@ export function SettingsView({
 
   useEffect(() => {
     void loadSettings();
+    const timer = window.setInterval(() => {
+      api
+        .getHardware()
+        .then(setHardware)
+        .catch(() => undefined);
+    }, 5000);
+    return () => window.clearInterval(timer);
   }, []);
 
   const handleSaveWorkspace = async (e: React.FormEvent) => {
@@ -168,12 +176,9 @@ export function SettingsView({
             <span className="text-xs text-emerald-600 dark:text-emerald-400">
               {savedNotice || ''}
             </span>
-            <button
-              type="submit"
-              className="px-4 py-2 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-500"
-            >
+            <LiquidButton type="submit" variant="default">
               Save Workspace
-            </button>
+            </LiquidButton>
           </div>
         </form>
 
@@ -236,12 +241,9 @@ export function SettingsView({
             <option value="engineer">engineer</option>
             <option value="viewer">viewer</option>
           </select>
-          <button
-            type="submit"
-            className="px-4 py-2 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-500 whitespace-nowrap"
-          >
+          <LiquidButton type="submit" variant="default">
             Generate Token
-          </button>
+          </LiquidButton>
         </form>
 
         {revealedSecret && (

@@ -78,3 +78,41 @@ test('rowsToCsv and rowsToJsonl serialize processed rows cleanly with round-trip
   assert.equal(parsedFromJsonl.length, 2);
   assert.equal(parsedFromJsonl[0].output, 'card_lost_or_stolen');
 });
+
+test('parseDatasetContent handles flexible JSON wrappers, single objects, dictionaries, BOM, and TSV', () => {
+  // Wrapper with "records" + UTF-8 BOM
+  const recordsJson = `\uFEFF${JSON.stringify({
+    meta: { source: 'export' },
+    records: [
+      { question: 'How do I freeze my card?', answer: 'card_lost_or_stolen' },
+      { question: 'What is the checking APY?', answer: 'fees_and_rates' },
+    ],
+  })}`;
+  const parsedRecords = parseDatasetContent(recordsJson, 'json');
+  assert.equal(parsedRecords.length, 2);
+  assert.equal(detectDatasetFormat(parsedRecords), 'instruction');
+
+  // Deeply nested array + single object fallback
+  const singleObjJson = JSON.stringify({ instruction: 'Summarize', input: 'Text here', output: 'Short' });
+  const parsedSingle = parseDatasetContent(singleObjJson, 'json');
+  assert.equal(parsedSingle.length, 1);
+  assert.equal(parsedSingle[0].output, 'Short');
+
+  // Dictionary of objects
+  const dictJson = JSON.stringify({
+    item1: { text: 'First document sample' },
+    item2: { text: 'Second document sample' },
+  });
+  assert.equal(parseDatasetContent(dictJson, 'json').length, 2);
+
+  // JSON lines stored in a .json file
+  const ndjsonInJson = '{"text":"Line one"}\n{"text":"Line two"}';
+  assert.equal(parseDatasetContent(ndjsonInJson, 'json').length, 2);
+
+  // TSV parsing
+  const tsv = 'instruction\toutput\nClassify\tcard_lost\nRate check\tfees';
+  const parsedTsv = parseDatasetContent(tsv, 'tsv');
+  assert.equal(parsedTsv.length, 2);
+  assert.equal(parsedTsv[1].output, 'fees');
+});
+

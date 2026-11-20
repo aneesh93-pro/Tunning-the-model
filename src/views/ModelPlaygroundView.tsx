@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
+  ArrowUp,
   Check,
   CheckCircle2,
   ClipboardCheck,
@@ -17,6 +18,8 @@ import {
   XCircle,
 } from 'lucide-react';
 import Markdown from 'react-markdown';
+import { LiquidButton } from '@/components/ui/liquid-glass-button';
+import { AquariumChatCanvas } from '../components/reactbits/AquariumChatCanvas';
 import { LatticeLoader } from '../components/reactbits/LatticeLoader';
 import { RubberSegment } from '../components/reactbits/RubberSegment';
 import { api } from '../lib/api';
@@ -36,6 +39,8 @@ const MODEL_GROUPS = [
   'Claude',
   'Gemini',
   'DeepSeek',
+  'NVIDIA NIM',
+  'Z.ai',
   'Open SLM',
   'Llama',
   'Mistral',
@@ -560,8 +565,8 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div>
+      <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+        <div className="min-w-0">
           <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
             Model Playground &amp; Grounded Verification
           </h1>
@@ -571,57 +576,67 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-          <RubberSegment
-            aria-label="Playground view mode"
-            value={viewMode}
-            size="sm"
-            trackColor={isDark ? '#171B26' : '#E2E8F0'}
-            thumbColor="#2563EB"
-            textColor={isDark ? '#94A3B8' : '#475569'}
-            activeTextColor="#FFFFFF"
-            onChange={(val) => setViewMode(val as 'chat' | 'report' | 'all')}
-            items={[
-              { value: 'chat', label: 'Structured Chat' },
-              { value: 'report', label: `Model Report (${reports.length})` },
-              { value: 'all', label: `All Models (${models.length})` },
-            ]}
-          />
-          <button
+          <div className="max-w-full overflow-x-auto">
+            <RubberSegment
+              aria-label="Playground view mode"
+              value={viewMode}
+              size="sm"
+              equalSlots={false}
+              className="w-max"
+              trackColor={isDark ? '#171B26' : '#E2E8F0'}
+              thumbColor="#2563EB"
+              textColor={isDark ? '#94A3B8' : '#475569'}
+              activeTextColor="#FFFFFF"
+              onChange={(val) => setViewMode(val as 'chat' | 'report' | 'all')}
+              items={[
+                { value: 'chat', label: 'Structured Chat' },
+                { value: 'report', label: `Model Report (${reports.length})` },
+                { value: 'all', label: `All Models (${models.length})` },
+              ]}
+            />
+          </div>
+          <LiquidButton
             type="button"
+            variant="default"
+            size="sm"
             onClick={() => handleRunModelReport()}
             disabled={!selectedRef || testingModel || testingAllModels}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 whitespace-nowrap"
+            className="whitespace-nowrap"
           >
             <ClipboardCheck className="w-3.5 h-3.5" />
             {testingModel ? 'Testing Model...' : 'Test Model & Generate Report'}
-          </button>
-          <button
+          </LiquidButton>
+          <LiquidButton
             type="button"
+            variant="default"
+            size="sm"
             onClick={handleRunAllModelsReport}
             disabled={models.length === 0 || testingAllModels || testingModel}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-50 whitespace-nowrap"
+            className="whitespace-nowrap"
           >
             <Layers className="w-3.5 h-3.5" />
             {testingAllModels
               ? `Testing All (${models.length})...`
               : `Test All Models (${models.length})`}
-          </button>
-          <button
+          </LiquidButton>
+          <LiquidButton
             type="button"
+            size="sm"
+            variant="outline"
             onClick={() => {
               setMessages([]);
               setActiveConvId(undefined);
             }}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-white/[0.1] hover:bg-slate-50 dark:hover:bg-white/[0.04] shrink-0 whitespace-nowrap"
+            className="shrink-0 whitespace-nowrap"
           >
             <Trash2 className="w-3.5 h-3.5" />
             Clear Chat
-          </button>
+          </LiquidButton>
         </div>
       </div>
 
       {reportError && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-xs text-red-600 dark:text-red-400">
+        <div className="rounded-lg border border-red-500/35 bg-red-50/95 dark:bg-[#220F14]/95 backdrop-blur-md px-4 py-2.5 text-xs text-red-700 dark:text-red-300">
           {reportError}
         </div>
       )}
@@ -664,6 +679,8 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
                   { ref: 'base:claude-3-opus', label: 'Claude 3 Opus' },
                   { ref: 'base:gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
                   { ref: 'base:deepseek-r1', label: 'DeepSeek-R1' },
+                  { ref: 'base:nvidia-llama-3.1-nemotron-70b', label: 'Nemotron-70B' },
+                  { ref: 'base:zai-glm-4.5', label: 'GLM-4.5' },
                 ]
                   .filter((q) => models.some((m) => m.ref === q.ref))
                   .map((q) => (
@@ -811,26 +828,30 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
                 <option value="anti_hallucination">Anti-Hallucination Probes Only</option>
               </select>
             </div>
-            <button
+            <LiquidButton
               type="button"
+              size="sm"
+              variant="default"
               onClick={() => handleRunModelReport()}
               disabled={!selectedRef || testingModel || testingAllModels}
-              className="w-full inline-flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg border border-blue-500/40 bg-blue-600/10 text-blue-600 dark:text-blue-400 hover:bg-blue-600/20 disabled:opacity-50"
+              className="w-full"
             >
               <Play className="w-3.5 h-3.5" />
               {testingModel ? 'Running Suite...' : 'Run Benchmark & View Report'}
-            </button>
-            <button
+            </LiquidButton>
+            <LiquidButton
               type="button"
+              size="sm"
+              variant="outline"
               onClick={handleRunAllModelsReport}
               disabled={models.length === 0 || testingAllModels || testingModel}
-              className="w-full inline-flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg border border-emerald-500/40 bg-emerald-600/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-600/20 disabled:opacity-50"
+              className="w-full"
             >
               <Layers className="w-3.5 h-3.5" />
               {testingAllModels
                 ? `Testing All ${models.length} Models...`
                 : `Test Every Model (${models.length})`}
-            </button>
+            </LiquidButton>
           </div>
 
           <div className="rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] p-5">
@@ -888,8 +909,8 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
         {/* Right Panel: Structured Chat OR Diagnostic Model Report OR All Models Matrix */}
         <div className="lg:col-span-8 min-w-0">
           {viewMode === 'chat' ? (
-            <div className="flex flex-col rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] h-[660px]">
-              <div className="px-5 py-3 border-b border-slate-200 dark:border-white/[0.08] flex items-center justify-between text-xs">
+            <div className="relative flex flex-col rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] overflow-hidden h-[660px]">
+              <div className="relative z-10 backdrop-blur-md bg-white/80 dark:bg-[#0C0F16]/80 px-5 py-3 border-b border-slate-200/70 dark:border-white/[0.08] flex items-center justify-between text-xs">
                 <span className="font-medium text-slate-900 dark:text-slate-100 truncate">
                   {models.find((m) => m.ref === selectedRef)?.label || 'Select model'}
                 </span>
@@ -905,20 +926,50 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
                     label="Verifying output"
                   />
                 ) : (
-                  <span className="font-mono text-slate-500">Boolean · Choice · Score</span>
+                  <span className="font-mono text-slate-600 dark:text-slate-300">
+                    Boolean · Choice · Score
+                  </span>
                 )}
               </div>
 
-              <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              <div className="relative flex-1 min-h-0 flex flex-col">
+                <div className="absolute inset-0 z-0">
+                  <AquariumChatCanvas darkTheme={isDark} dimmed={messages.length > 0} />
+                </div>
+
                 {messages.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center text-center max-w-lg mx-auto">
-                    <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
-                      Test any model with structured boolean / choice / score outputs
+                  <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 text-center pointer-events-none">
+                    <h2 className="text-2xl sm:text-3xl font-normal tracking-tight text-slate-800 dark:text-slate-100 drop-shadow-sm mb-5 select-none">
+                      What&apos;s on your mind?
+                    </h2>
+
+                    <form
+                      onSubmit={handleSend}
+                      className="pointer-events-auto w-full max-w-md rounded-full border border-white/60 dark:border-white/25 bg-white/45 dark:bg-slate-900/45 backdrop-blur-md shadow-[0_8px_32px_rgba(15,23,42,0.12)] px-4 py-1.5 flex items-center gap-2"
+                    >
+                      <input
+                        type="text"
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        placeholder="Ask anything"
+                        aria-label="Ask anything"
+                        className="flex-1 bg-transparent text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-700/80 dark:placeholder:text-slate-300/80 focus:outline-none px-2 py-1"
+                      />
+                      <button
+                        type="submit"
+                        aria-label="Send query"
+                        disabled={streaming || !input.trim() || !selectedRef}
+                        className="w-8 h-8 rounded-full bg-white/85 hover:bg-white text-slate-900 border border-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.95),0_4px_12px_rgba(15,23,42,0.14)] backdrop-blur-md flex items-center justify-center transition-all disabled:opacity-45 shrink-0"
+                      >
+                        <ArrowUp className="w-4 h-4" />
+                      </button>
+                    </form>
+
+                    <p className="mt-3 text-[11px] font-medium text-slate-800/85 dark:text-slate-200/85 select-none">
+                      Move through the water, or tap it.
                     </p>
-                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                      Every pretrained base model and fine-tuned LoRA adapter validates predictions against allowed choices to detect hallucinations such as fabricated entities.
-                    </p>
-                    <div className="mt-4 flex flex-wrap justify-center gap-2">
+
+                    <div className="pointer-events-auto mt-5 flex flex-wrap justify-center gap-1.5 max-w-lg">
                       {QUICK_PROMPTS.map((qp) => (
                         <button
                           key={qp.label}
@@ -927,7 +978,7 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
                             setInput(qp.prompt);
                             setCandidateChoicesInput(qp.choices);
                           }}
-                          className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-white/[0.1] bg-slate-50 dark:bg-[#090B10] hover:border-blue-500/40"
+                          className="rounded-full backdrop-blur-md bg-white/60 dark:bg-slate-900/60 border border-white/60 dark:border-white/15 px-3 py-1 text-[11px] font-medium text-slate-800 dark:text-slate-100 hover:bg-white/80 dark:hover:bg-slate-900/80 transition-colors"
                         >
                           {qp.label}
                         </button>
@@ -935,111 +986,120 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
                     </div>
                   </div>
                 ) : (
-                  messages.map((m) => (
-                    <div
-                      key={m.id}
-                      className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}
-                    >
-                      <div
-                        className={`max-w-[88%] rounded-xl px-4 py-3 text-xs leading-relaxed ${
-                          m.role === 'user'
-                            ? 'bg-blue-600 text-white'
-                            : 'border border-slate-200 dark:border-white/[0.08] bg-slate-50 dark:bg-[#090B10] text-slate-800 dark:text-slate-200'
-                        }`}
-                      >
-                        {m.role === 'assistant' && m.structured && (
-                          <div className="mb-3 grid grid-cols-3 gap-2 rounded-lg border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] p-2.5 font-mono tabular-nums">
-                            <div>
-                              <div className="text-[10px] uppercase text-slate-500">boolean</div>
-                              <div
-                                className={`mt-0.5 text-xs font-semibold ${
-                                  m.structured.booleanValue
-                                    ? 'text-emerald-600 dark:text-emerald-400'
-                                    : 'text-amber-600 dark:text-amber-400'
-                                }`}
-                              >
-                                {String(m.structured.booleanValue)}
-                              </div>
-                            </div>
-                            <div className="min-w-0">
-                              <div className="text-[10px] uppercase text-slate-500">choice</div>
-                              <div className="mt-0.5 text-xs font-semibold text-blue-600 dark:text-blue-400 truncate">
-                                {m.structured.choice}
-                              </div>
-                            </div>
-                            <div>
-                              <div className="text-[10px] uppercase text-slate-500">score</div>
-                              <div className="mt-0.5 text-xs font-semibold text-slate-900 dark:text-slate-100">
-                                {m.structured.score.toFixed(4)}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {m.role === 'assistant' && m.structured?.hallucinationFlag && (
-                          <div className="mb-2 flex items-center gap-1.5 text-[11px] font-medium text-red-600 dark:text-red-400">
-                            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                            Potential hallucination flagged outside candidate choices
-                          </div>
-                        )}
-
-                        <div className="prose prose-sm dark:prose-invert max-w-none prose-pre:bg-black/40 prose-pre:p-2 prose-pre:rounded">
-                          <Markdown>{m.content || (streaming ? '...' : '')}</Markdown>
-                        </div>
-                      </div>
-
-                      {m.role === 'assistant' && m.content && (
-                        <div className="mt-1.5 flex flex-wrap items-center gap-3 text-[11px] font-mono tabular-nums text-slate-500 dark:text-slate-400">
-                          {m.structured && (
-                            <span>
-                              {m.structured.grounded ? 'Grounded' : 'Flagged'} ·{' '}
-                              {m.structured.choicesConsidered.length} choices
-                            </span>
-                          )}
-                          {m.latencyMs !== undefined && <span>{m.latencyMs} ms</span>}
-                          {m.tokensGenerated !== undefined && <span>{m.tokensGenerated} tok</span>}
-                          <button
-                            type="button"
-                            onClick={() => handleCopy(m.id, m.content)}
-                            className="inline-flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-200"
+                  <>
+                    <div className="relative z-10 flex-1 overflow-y-auto p-5 space-y-4 pointer-events-auto">
+                      {messages.map((m) => (
+                        <div
+                          key={m.id}
+                          className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}
+                        >
+                          <div
+                            className={`max-w-[88%] rounded-xl px-4 py-3 text-xs leading-relaxed shadow-sm ${
+                              m.role === 'user'
+                                ? 'bg-blue-600/90 backdrop-blur-md text-white'
+                                : 'border border-white/40 dark:border-white/15 bg-white/88 dark:bg-[#090B10]/88 backdrop-blur-md text-slate-800 dark:text-slate-200'
+                            }`}
                           >
-                            {copiedId === m.id ? (
-                              <>
-                                <Check className="w-3 h-3" /> Copied
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="w-3 h-3" /> Copy
-                              </>
+                            {m.role === 'assistant' && m.structured && (
+                              <div className="mb-3 grid grid-cols-3 gap-2 rounded-lg border border-slate-200/80 dark:border-white/[0.08] bg-white/90 dark:bg-[#11141C]/90 p-2.5 font-mono tabular-nums">
+                                <div>
+                                  <div className="text-[10px] uppercase text-slate-500">boolean</div>
+                                  <div
+                                    className={`mt-0.5 text-xs font-semibold ${
+                                      m.structured.booleanValue
+                                        ? 'text-emerald-600 dark:text-emerald-400'
+                                        : 'text-amber-600 dark:text-amber-400'
+                                    }`}
+                                  >
+                                    {String(m.structured.booleanValue)}
+                                  </div>
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="text-[10px] uppercase text-slate-500">choice</div>
+                                  <div className="mt-0.5 text-xs font-semibold text-blue-600 dark:text-blue-400 truncate">
+                                    {m.structured.choice}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="text-[10px] uppercase text-slate-500">score</div>
+                                  <div className="mt-0.5 text-xs font-semibold text-slate-900 dark:text-slate-100">
+                                    {m.structured.score.toFixed(4)}
+                                  </div>
+                                </div>
+                              </div>
                             )}
-                          </button>
+
+                            {m.role === 'assistant' && m.structured?.hallucinationFlag && (
+                              <div className="mb-2 flex items-center gap-1.5 text-[11px] font-medium text-red-600 dark:text-red-400">
+                                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                                Potential hallucination flagged outside candidate choices
+                              </div>
+                            )}
+
+                            <div className="prose prose-sm dark:prose-invert max-w-none prose-pre:bg-black/40 prose-pre:p-2 prose-pre:rounded">
+                              <Markdown>{m.content || (streaming ? '...' : '')}</Markdown>
+                            </div>
+                          </div>
+
+                          {m.role === 'assistant' && m.content && (
+                            <div className="mt-1.5 inline-flex flex-wrap items-center gap-3 rounded-full bg-white/70 dark:bg-slate-900/70 backdrop-blur-md px-2.5 py-0.5 text-[11px] font-mono tabular-nums text-slate-700 dark:text-slate-300">
+                              {m.structured && (
+                                <span>
+                                  {m.structured.grounded ? 'Grounded' : 'Flagged'} ·{' '}
+                                  {m.structured.choicesConsidered.length} choices
+                                </span>
+                              )}
+                              {m.latencyMs !== undefined && <span>{m.latencyMs} ms</span>}
+                              {m.tokensGenerated !== undefined && <span>{m.tokensGenerated} tok</span>}
+                              <button
+                                type="button"
+                                onClick={() => handleCopy(m.id, m.content)}
+                                className="inline-flex items-center gap-1 hover:text-slate-950 dark:hover:text-white"
+                              >
+                                {copiedId === m.id ? (
+                                  <>
+                                    <Check className="w-3 h-3" /> Copied
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="w-3 h-3" /> Copy
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          )}
                         </div>
-                      )}
+                      ))}
                     </div>
-                  ))
+
+                    <form
+                      onSubmit={handleSend}
+                      className="relative z-10 p-3.5 border-t border-white/30 dark:border-white/[0.08] bg-white/75 dark:bg-[#0C0F16]/80 backdrop-blur-md flex items-center gap-2.5 pointer-events-auto"
+                    >
+                      <div className="flex-1 flex items-center rounded-full border border-white/60 dark:border-white/20 bg-white/65 dark:bg-[#090B10]/75 px-3.5 py-1.5">
+                        <input
+                          type="text"
+                          value={input}
+                          onChange={(e) => setInput(e.target.value)}
+                          placeholder="Ask anything"
+                          aria-label="Ask anything"
+                          className="flex-1 bg-transparent text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-500 focus:outline-none"
+                        />
+                      </div>
+                      <LiquidButton
+                        type="submit"
+                        variant="default"
+                        size="sm"
+                        disabled={streaming || !input.trim() || !selectedRef}
+                        className="rounded-full px-4"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                        Send
+                      </LiquidButton>
+                    </form>
+                  </>
                 )}
               </div>
-
-              <form
-                onSubmit={handleSend}
-                className="p-4 border-t border-slate-200 dark:border-white/[0.08] flex gap-2.5"
-              >
-                <input
-                  type="text"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder="Enter prompt or verification query to test model..."
-                  className="flex-1 px-3.5 py-2.5 text-xs rounded-lg border border-slate-200 dark:border-white/[0.1] bg-slate-50 dark:bg-[#090B10]"
-                />
-                <button
-                  type="submit"
-                  disabled={streaming || !input.trim() || !selectedRef}
-                  className="inline-flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  Send
-                </button>
-              </form>
             </div>
           ) : viewMode === 'report' ? (
             <div className="rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] p-5 space-y-5">
@@ -1259,15 +1319,16 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 shrink-0">
-                  <button
+                  <LiquidButton
                     type="button"
+                    variant="default"
+                    size="sm"
                     onClick={handleRunAllModelsReport}
                     disabled={models.length === 0 || testingAllModels || testingModel}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-50"
                   >
                     <Play className="w-3.5 h-3.5" />
                     {testingAllModels ? 'Running Sweep...' : 'Run Test All Models'}
-                  </button>
+                  </LiquidButton>
                   <button
                     type="button"
                     disabled={filteredLeaderboardRows.length === 0}

@@ -23,6 +23,7 @@ import Dock, { type DockItemData } from './components/reactbits/Dock';
 import GradientASCII from './components/reactbits/GradientASCII';
 import { SiteFooter } from './components/SiteFooter';
 import { WelcomeIntro } from './components/WelcomeIntro';
+import { LiquidButton } from '@/components/ui/liquid-glass-button';
 import { api, type OverviewResponse } from './lib/api';
 import { OverviewView, type NavSection } from './views/OverviewView';
 
@@ -105,6 +106,18 @@ export default function App() {
   useEffect(() => {
     void loadOverview();
   }, [section]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      api
+        .getHardware()
+        .then((hw) => {
+          setOverview((prev) => (prev ? { ...prev, hardware: hw } : prev));
+        })
+        .catch(() => undefined);
+    }, 15000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (!showNotifications) return undefined;
@@ -404,14 +417,16 @@ export default function App() {
               {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
 
-            <button
+            <LiquidButton
               type="button"
+              variant="default"
+              size="sm"
               onClick={() => handleNavigate('studio')}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-500 whitespace-nowrap shrink-0"
+              className="shrink-0"
             >
               <Plus className="w-3.5 h-3.5" />
               New Experiment
-            </button>
+            </LiquidButton>
           </div>
         </header>
 
@@ -481,7 +496,9 @@ export default function App() {
             {section === 'playground' && (
               <ModelPlaygroundView initialModelRef={playgroundModelRef} />
             )}
-            {section === 'evaluation' && <EvaluationCenterView />}
+            {section === 'evaluation' && (
+              <EvaluationCenterView onNavigate={handleNavigate} />
+            )}
             {section === 'comparison' && <ModelComparisonView />}
             {section === 'registry' && (
               <ModelRegistryView

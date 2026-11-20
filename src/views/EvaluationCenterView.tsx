@@ -1,11 +1,26 @@
-import { useEffect, useState } from 'react';
-import { AlertTriangle, BarChart3, Play } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  AlertTriangle,
+  ArrowRight,
+  BarChart3,
+  CheckCircle2,
+  Play,
+  ShieldAlert,
+  Wrench,
+} from 'lucide-react';
 import { LatticeLoader } from '../components/reactbits/LatticeLoader';
+import { LiquidButton } from '@/components/ui/liquid-glass-button';
 import { api } from '../lib/api';
+import { analyzeEvaluationRun } from '../ml/evaluationDiagnostics';
 import type { DatasetRecord, EvaluationRunRecord } from '../shared/types';
+import type { NavSection } from './OverviewView';
 
-export function EvaluationCenterView() {
-  const [models, setModels] = useState<Array<{ ref: string; label: string }>>([]);
+interface EvaluationCenterViewProps {
+  onNavigate?: (section: NavSection) => void;
+}
+
+export function EvaluationCenterView({ onNavigate }: EvaluationCenterViewProps) {
+  const [models, setModels] = useState<Array<{ ref: string; label: string; aiTool?: string }>>([]);
   const [datasets, setDatasets] = useState<DatasetRecord[]>([]);
   const [evaluations, setEvaluations] = useState<EvaluationRunRecord[]>([]);
   const [selectedModelRef, setSelectedModelRef] = useState('');
@@ -52,6 +67,24 @@ export function EvaluationCenterView() {
     }
   };
 
+  const diagnosis = useMemo(
+    () => (activeEval ? analyzeEvaluationRun(activeEval) : null),
+    [activeEval]
+  );
+
+  const modelGroups = [
+    'Trained Adapter',
+    'NVIDIA NIM',
+    'Z.ai',
+    'ChatGPT',
+    'Claude',
+    'Gemini',
+    'DeepSeek',
+    'Open SLM',
+    'Llama',
+    'Mistral',
+  ];
+
   return (
     <div className="space-y-6">
       <div>
@@ -59,7 +92,7 @@ export function EvaluationCenterView() {
           Evaluation Center
         </h1>
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          Benchmark models strictly on held-out test splits. Validation and test sets remain isolated to prevent leakage.
+          Benchmark models strictly on held-out test splits, diagnose misclassifications and perplexity spikes, and inspect actionable steps to rectify errors.
         </p>
       </div>
 
@@ -70,15 +103,24 @@ export function EvaluationCenterView() {
             Model / Fine-Tuned Adapter
           </label>
           <select
+            aria-label="Model or Fine-Tuned Adapter"
             value={selectedModelRef}
             onChange={(e) => setSelectedModelRef(e.target.value)}
             className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-white/[0.1] bg-slate-50 dark:bg-[#090B10]"
           >
-            {models.map((m) => (
-              <option key={m.ref} value={m.ref}>
-                {m.label}
-              </option>
-            ))}
+            {modelGroups.map((group) => {
+              const items = models.filter((m) => (m.aiTool ?? 'Open SLM') === group);
+              if (items.length === 0) return null;
+              return (
+                <optgroup key={group} label={group}>
+                  {items.map((m) => (
+                    <option key={m.ref} value={m.ref}>
+                      {m.label}
+                    </option>
+                  ))}
+                </optgroup>
+              );
+            })}
           </select>
         </div>
         <div className="flex-1">
@@ -86,6 +128,7 @@ export function EvaluationCenterView() {
             Held-Out Test Dataset
           </label>
           <select
+            aria-label="Held-Out Test Dataset"
             value={selectedDatasetId}
             onChange={(e) => setSelectedDatasetId(e.target.value)}
             className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-white/[0.1] bg-slate-50 dark:bg-[#090B10]"
@@ -97,15 +140,15 @@ export function EvaluationCenterView() {
             ))}
           </select>
         </div>
-        <button
+        <LiquidButton
           type="button"
+          variant="default"
           disabled={running || !selectedModelRef || !selectedDatasetId}
           onClick={handleRunEval}
-          className="inline-flex items-center gap-2 px-4 py-2 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 whitespace-nowrap"
         >
           <Play className="w-3.5 h-3.5" />
           {running ? 'Evaluating...' : 'Run Evaluation'}
-        </button>
+        </LiquidButton>
       </div>
 
       {running && (
@@ -125,7 +168,7 @@ export function EvaluationCenterView() {
       )}
 
       {error && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-red-600 dark:text-red-400 flex items-center gap-2">
+        <div className="rounded-lg border border-red-500/35 bg-red-50/95 dark:bg-[#220F14]/95 backdrop-blur-md px-4 py-3 text-xs text-red-700 dark:text-red-300 flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           <span>{error}</span>
         </div>
@@ -138,7 +181,7 @@ export function EvaluationCenterView() {
             No evaluation reports generated yet
           </p>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Select a model and test dataset above to compute accuracy, F1, perplexity, and confusion matrix.
+            Select a model and test dataset above to compute accuracy, F1, perplexity, confusion matrix, and error rectification diagnostics.
           </p>
         </div>
       ) : (
@@ -249,6 +292,147 @@ export function EvaluationCenterView() {
               </div>
             </div>
 
+            {/* Error Analysis & Way to Rectify Panel */}
+            {diagnosis && (
+              <section
+                aria-label="Error analysis and rectification"
+                className="rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] p-5 space-y-4"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-white/[0.06] pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div
+                      className={`p-2 rounded-lg ${
+                        diagnosis.overallHealth === 'critical'
+                          ? 'bg-red-500/10 text-red-600 dark:text-red-400'
+                          : diagnosis.overallHealth === 'warning'
+                            ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                            : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                      }`}
+                    >
+                      {diagnosis.overallHealth === 'healthy' ? (
+                        <CheckCircle2 className="w-4 h-4" />
+                      ) : (
+                        <ShieldAlert className="w-4 h-4" />
+                      )}
+                    </div>
+                    <div>
+                      <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        Error Analysis &amp; How to Rectify
+                      </h2>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        {diagnosis.summary}
+                      </p>
+                    </div>
+                  </div>
+                  <span
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-mono font-semibold uppercase ${
+                      diagnosis.overallHealth === 'critical'
+                        ? 'bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/30'
+                        : diagnosis.overallHealth === 'warning'
+                          ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30'
+                          : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30'
+                    }`}
+                  >
+                    {diagnosis.overallHealth} · {diagnosis.mismatchCount} errors
+                  </span>
+                </div>
+
+                {diagnosis.topConfusions.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="font-medium text-slate-600 dark:text-slate-300">
+                      Top Confusion Pairs:
+                    </span>
+                    {diagnosis.topConfusions.map((pair, idx) => (
+                      <span
+                        key={idx}
+                        className="px-2 py-1 rounded-md border border-red-500/25 bg-red-500/10 font-mono text-[11px] text-red-600 dark:text-red-300"
+                      >
+                        {pair.actual} → {pair.predicted} ({pair.count}×)
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  {diagnosis.diagnostics.map((diag) => (
+                    <div
+                      key={diag.id}
+                      className={`rounded-lg border p-4 space-y-2 ${
+                        diag.severity === 'critical'
+                          ? 'border-red-500/30 bg-red-500/[0.05]'
+                          : diag.severity === 'warning'
+                            ? 'border-amber-500/30 bg-amber-500/[0.05]'
+                            : 'border-blue-500/25 bg-blue-500/[0.04]'
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 text-xs font-semibold text-slate-900 dark:text-slate-100">
+                          <Wrench className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                          <span>{diag.title}</span>
+                        </div>
+                        <span className="text-[10px] font-mono uppercase text-slate-500 dark:text-slate-400">
+                          {diag.severity}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                        <strong className="text-slate-800 dark:text-slate-100">Why it happened:</strong>{' '}
+                        {diag.explanation}
+                      </p>
+                      <div className="rounded-md border border-slate-200/80 dark:border-white/[0.08] bg-white/80 dark:bg-[#090B10]/70 p-2.5 text-xs text-slate-700 dark:text-slate-200 leading-relaxed">
+                        <strong className="text-blue-600 dark:text-blue-400">How to rectify:</strong>{' '}
+                        {diag.rectification}
+                      </div>
+                      {diag.recommendedAction && onNavigate && (
+                        <div className="pt-1">
+                          <LiquidButton
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => onNavigate(diag.recommendedAction!.targetSection)}
+                            className="text-blue-600 dark:text-blue-400 border-blue-500/35"
+                          >
+                            {diag.recommendedAction.label}
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </LiquidButton>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {diagnosis.hardestSamples.length > 0 && (
+                  <div className="pt-2 border-t border-slate-200 dark:border-white/[0.06] space-y-2">
+                    <div className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      Highest-Loss / Failing Samples ({diagnosis.hardestSamples.length})
+                    </div>
+                    <div className="space-y-1.5">
+                      {diagnosis.hardestSamples.map((s) => (
+                        <div
+                          key={s.index}
+                          className="rounded-lg border border-slate-200 dark:border-white/[0.06] bg-slate-50 dark:bg-[#090B10] px-3 py-2 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <span className="font-mono text-slate-400 mr-2">#{s.index + 1}</span>
+                            <span className="text-slate-800 dark:text-slate-200 truncate inline-block max-w-md align-bottom">
+                              {s.prompt}
+                            </span>
+                          </div>
+                          <div className="font-mono text-[11px] shrink-0 flex items-center gap-2">
+                            <span className="text-emerald-600 dark:text-emerald-400">
+                              gt:{s.groundTruth}
+                            </span>
+                            <span className="text-slate-400">vs</span>
+                            <span className="text-red-500">pred:{s.prediction}</span>
+                            <span className="text-slate-500">loss {s.loss.toFixed(2)}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </section>
+            )}
+
             {/* Confusion Matrix */}
             {activeEval.confusionMatrix && (
               <div className="rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] p-5 overflow-x-auto">
@@ -343,3 +527,4 @@ export function EvaluationCenterView() {
     </div>
   );
 }
+
