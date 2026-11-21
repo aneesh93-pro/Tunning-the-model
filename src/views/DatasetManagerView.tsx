@@ -950,13 +950,14 @@ export function DatasetManagerView({
               </p>
             </div>
             <div className="flex justify-end gap-2">
-              <button
+              <LiquidButton
                 type="button"
+                size="sm"
+                variant="outline"
                 onClick={() => setShowPasteModal(false)}
-                className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-white/[0.1]"
               >
                 Cancel
-              </button>
+              </LiquidButton>
               <LiquidButton type="submit" variant="default" disabled={busy}>
                 Save Dataset
               </LiquidButton>

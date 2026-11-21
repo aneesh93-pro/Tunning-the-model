@@ -292,8 +292,14 @@ export function ModelComparisonView() {
               <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">
                 Metric Comparison Chart
               </h2>
-              <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="h-72 w-full min-w-0">
+                <ResponsiveContainer
+                  width="100%"
+                  height={288}
+                  minWidth={0}
+                  minHeight={288}
+                  initialDimension={{ width: 420, height: 288 }}
+                >
                   <BarChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.14)" />
                     <XAxis dataKey="metric" tick={{ fontSize: 11, fill: '#94A3B8' }} />

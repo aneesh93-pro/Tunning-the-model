@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
+import { LiquidButton } from '@/components/ui/liquid-glass-button';
 import { BlurText } from './reactbits/BlurText';
 import { ShinyText } from './reactbits/ShinyText';
 
@@ -213,21 +214,22 @@ export function WelcomeIntro({ theme, onComplete }: WelcomeIntroProps) {
               />
             </div>
 
-            <motion.button
-              type="button"
-              onClick={dismiss}
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.4, duration: 0.3 }}
-              className={`mt-6 inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg border transition-colors whitespace-nowrap ${
-                isDark
-                  ? 'border-white/[0.1] bg-white/[0.04] text-slate-300 hover:bg-white/[0.08] hover:text-white'
-                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-              }`}
+              className="mt-6"
             >
-              <span>Enter Studio</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </motion.button>
+              <LiquidButton
+                type="button"
+                variant="default"
+                size="sm"
+                onClick={dismiss}
+              >
+                <span>Enter Studio</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </LiquidButton>
+            </motion.div>
           </div>
         </motion.div>
       )}

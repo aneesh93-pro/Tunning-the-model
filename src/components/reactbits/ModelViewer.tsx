@@ -25,27 +25,6 @@ import { applyThreeShaderSafetyFixes } from '../../utils/threeShaderFixes';
 
 applyThreeShaderSafetyFixes();
 
-const THREE_CLOCK_WARNING_INSTALLED = Symbol.for('minimind.threeClockWarnFiltered');
-if (typeof window !== 'undefined' && !Reflect.get(globalThis, THREE_CLOCK_WARNING_INSTALLED)) {
-  Reflect.set(globalThis, THREE_CLOCK_WARNING_INSTALLED, true);
-  const originalWarn = console.warn.bind(console);
-  console.warn = (...args: unknown[]) => {
-    const first = typeof args[0] === 'string' ? args[0] : '';
-    const second = typeof args[1] === 'string' ? args[1] : '';
-    if (first.includes('THREE.Clock: This module has been deprecated')) {
-      return;
-    }
-    if (
-      first.includes('THREE.WebGLProgram: Program Info Log') &&
-      second.includes('warning X4008: floating point division by zero') &&
-      !second.includes('ERROR')
-    ) {
-      return;
-    }
-    originalWarn(...args);
-  };
-}
-
 export type ModelViewerEnvironment =
   | 'studio'
   | 'city'

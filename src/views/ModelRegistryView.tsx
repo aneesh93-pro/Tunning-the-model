@@ -322,13 +322,14 @@ ${JSON.stringify(m.trainingConfig, null, 2)}
               Remove <span className="font-mono">{confirmDelete.name}</span> from the Model Registry?
             </p>
             <div className="flex justify-end gap-2">
-              <button
+              <LiquidButton
                 type="button"
+                size="sm"
+                variant="outline"
                 onClick={() => setConfirmDelete(null)}
-                className="px-3.5 py-2 text-xs rounded-lg border border-slate-200 dark:border-white/[0.1]"
               >
                 Cancel
-              </button>
+              </LiquidButton>
               <button
                 type="button"
                 onClick={handleDelete}

@@ -1116,8 +1116,10 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
                 </div>
                 {activeReport && (
                   <div className="flex flex-wrap items-center gap-2">
-                    <button
+                    <LiquidButton
                       type="button"
+                      size="sm"
+                      variant="outline"
                       onClick={() =>
                         downloadTextFile(
                           `${activeReport.id}-report.md`,
@@ -1125,13 +1127,14 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
                           'text/markdown'
                         )
                       }
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-white/[0.1] hover:bg-slate-50 dark:hover:bg-white/[0.04]"
                     >
                       <FileText className="w-3.5 h-3.5" />
                       Export Markdown
-                    </button>
-                    <button
+                    </LiquidButton>
+                    <LiquidButton
                       type="button"
+                      size="sm"
+                      variant="outline"
                       onClick={() =>
                         downloadTextFile(
                           `${activeReport.id}-report.json`,
@@ -1139,11 +1142,10 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
                           'application/json'
                         )
                       }
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-white/[0.1] hover:bg-slate-50 dark:hover:bg-white/[0.04]"
                     >
                       <Download className="w-3.5 h-3.5" />
                       Export JSON
-                    </button>
+                    </LiquidButton>
                   </div>
                 )}
               </div>
@@ -1329,8 +1331,10 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
                     <Play className="w-3.5 h-3.5" />
                     {testingAllModels ? 'Running Sweep...' : 'Run Test All Models'}
                   </LiquidButton>
-                  <button
+                  <LiquidButton
                     type="button"
+                    size="sm"
+                    variant="outline"
                     disabled={filteredLeaderboardRows.length === 0}
                     onClick={() =>
                       downloadTextFile(
@@ -1339,13 +1343,14 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
                         'text/csv'
                       )
                     }
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-white/[0.1] hover:bg-slate-50 dark:hover:bg-white/[0.04] disabled:opacity-50"
                   >
                     <FileSpreadsheet className="w-3.5 h-3.5" />
                     Export CSV
-                  </button>
-                  <button
+                  </LiquidButton>
+                  <LiquidButton
                     type="button"
+                    size="sm"
+                    variant="outline"
                     disabled={filteredLeaderboardRows.length === 0}
                     onClick={() =>
                       downloadTextFile(
@@ -1354,11 +1359,10 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
                         'text/markdown'
                       )
                     }
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-white/[0.1] hover:bg-slate-50 dark:hover:bg-white/[0.04] disabled:opacity-50"
                   >
                     <FileText className="w-3.5 h-3.5" />
                     Export Markdown
-                  </button>
+                  </LiquidButton>
                 </div>
               </div>
 

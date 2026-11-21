@@ -386,8 +386,14 @@ export function TrainingMonitorView({
               <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">
                 Training &amp; Validation Loss
               </h3>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="h-64 w-full min-w-0">
+                <ResponsiveContainer
+                  width="100%"
+                  height={256}
+                  minWidth={0}
+                  minHeight={256}
+                  initialDimension={{ width: 480, height: 256 }}
+                >
                   <LineChart data={metrics}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.14)" />
                     <XAxis dataKey="step" tick={{ fontSize: 11, fill: '#94A3B8' }} />
@@ -431,8 +437,14 @@ export function TrainingMonitorView({
               <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">
                 Learning Rate Schedule &amp; Process Memory (MB)
               </h3>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="h-64 w-full min-w-0">
+                <ResponsiveContainer
+                  width="100%"
+                  height={256}
+                  minWidth={0}
+                  minHeight={256}
+                  initialDimension={{ width: 480, height: 256 }}
+                >
                   <AreaChart data={metrics}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.14)" />
                     <XAxis dataKey="step" tick={{ fontSize: 11, fill: '#94A3B8' }} />

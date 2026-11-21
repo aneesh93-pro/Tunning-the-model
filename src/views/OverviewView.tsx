@@ -390,14 +390,15 @@ export function OverviewView({ data, loading, onNavigate, onOpenPlayground }: Ov
               </p>
             </div>
           </div>
-          <button
+          <LiquidButton
             type="button"
+            size="sm"
+            variant="outline"
             onClick={() => onNavigate('studio')}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
           >
             Launch Fine-Tuning Studio
             <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+          </LiquidButton>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -469,14 +470,15 @@ export function OverviewView({ data, loading, onNavigate, onOpenPlayground }: Ov
                 </div>
               </div>
               <div>
-                <button
+                <LiquidButton
                   type="button"
+                  size="sm"
+                  variant="outline"
                   onClick={() => onNavigate(ex.target)}
-                  className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
                 >
                   {ex.cta}
                   <ArrowRight className="w-3.5 h-3.5" />
-                </button>
+                </LiquidButton>
               </div>
             </div>
           ))}
@@ -1015,8 +1017,14 @@ export function OverviewView({ data, loading, onNavigate, onOpenPlayground }: Ov
               </LiquidButton>
             </div>
           ) : (
-            <div className="h-56">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-56 w-full min-w-0">
+              <ResponsiveContainer
+                width="100%"
+                height={224}
+                minWidth={0}
+                minHeight={224}
+                initialDimension={{ width: 480, height: 224 }}
+              >
                 <BarChart data={activityData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.14)" />
                   <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#94A3B8' }} />
@@ -1083,8 +1091,14 @@ export function OverviewView({ data, loading, onNavigate, onOpenPlayground }: Ov
               </LiquidButton>
             </div>
           ) : (
-            <div className="h-56">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-56 w-full min-w-0">
+              <ResponsiveContainer
+                width="100%"
+                height={224}
+                minWidth={0}
+                minHeight={224}
+                initialDimension={{ width: 480, height: 224 }}
+              >
                 <BarChart data={evalChartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.14)" />
                   <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#94A3B8' }} />

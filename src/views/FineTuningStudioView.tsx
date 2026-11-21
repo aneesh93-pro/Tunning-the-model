@@ -811,14 +811,15 @@ export function FineTuningStudioView({
               <span className="font-mono">artifacts/</span>, and stream live loss telemetry.
             </p>
             <div className="flex justify-end gap-2.5 pt-2">
-              <button
+              <LiquidButton
                 type="button"
+                size="sm"
+                variant="outline"
                 disabled={submitting}
                 onClick={() => setShowConfirm(false)}
-                className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-white/[0.1]"
               >
                 Cancel
-              </button>
+              </LiquidButton>
               <LiquidButton
                 type="button"
                 variant="default"
