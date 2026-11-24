@@ -1,0 +1,5 @@
+First paragraph explaining LoRA rank selection and alpha scaling.
+
+Second paragraph covering 4-bit NF4 double quantization on edge hardware.
+
+Third paragraph validating held-out splits with zero data leakage.

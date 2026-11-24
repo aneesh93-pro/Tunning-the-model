@@ -11,6 +11,7 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
+  Legend,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -18,8 +19,9 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { LatticeLoader } from '../components/reactbits/LatticeLoader';
+import { AiOrb } from '@/components/ui/ai-orb';
 import { LiquidButton } from '@/components/ui/liquid-glass-button';
+import { mapExperimentStatusToOrbState } from '@/utils/aiOrbState';
 import { api } from '../lib/api';
 import { formatBytes, formatDuration } from '../lib/utils';
 import type {
@@ -54,10 +56,13 @@ export function TrainingMonitorView({
   >([]);
   const [logs, setLogs] = useState<string[]>([]);
   const [hardware, setHardware] = useState<HardwareTelemetry | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const logContainerRef = useRef<HTMLDivElement>(null);
+  const skipNextFetchIdRef = useRef<string | null>(null);
 
   const loadListAndDetail = async (targetId?: string | null) => {
+    setLoading((prev) => (selectedExp ? prev : true));
     try {
       const list = await api.getExperiments();
       setExperiments(list);
@@ -70,9 +75,6 @@ export function TrainingMonitorView({
         setError(null);
         return;
       }
-      if (!activeExperimentId && id !== activeExperimentId) {
-        onSelectExperiment(id);
-      }
       const detail = await api.getExperimentDetail(id);
       setSelectedExp(detail.experiment);
       setMetrics(detail.metrics);
@@ -80,12 +82,22 @@ export function TrainingMonitorView({
       setLogs(detail.logs);
       setHardware(detail.hardware);
       setError(null);
+      if (!activeExperimentId && id !== activeExperimentId) {
+        skipNextFetchIdRef.current = id;
+        onSelectExperiment(id);
+      }
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
+    if (activeExperimentId && skipNextFetchIdRef.current === activeExperimentId) {
+      skipNextFetchIdRef.current = null;
+      return;
+    }
     void loadListAndDetail(activeExperimentId);
   }, [activeExperimentId]);
 
@@ -219,7 +231,15 @@ export function TrainingMonitorView({
         </div>
       )}
 
-      {!selectedExp ? (
+      {loading && !selectedExp ? (
+        <div className="space-y-4 animate-pulse">
+          <div className="h-28 rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C]" />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="h-64 rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C]" />
+            <div className="h-64 rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C]" />
+          </div>
+        </div>
+      ) : !selectedExp ? (
         <div className="rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] p-12 text-center">
           <Terminal className="w-8 h-8 text-slate-400 mx-auto mb-2" />
           <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
@@ -232,7 +252,7 @@ export function TrainingMonitorView({
       ) : (
         <>
           {/* Live Status & Controls */}
-          <div className="rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] p-5 space-y-4">
+          <div className="liquid-glass-surface rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white/90 dark:bg-[#11141C]/88 p-5 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
                 <div className="flex items-center gap-3 text-xs font-mono text-slate-500 dark:text-slate-400">
@@ -248,24 +268,22 @@ export function TrainingMonitorView({
               </div>
 
               <div className="flex items-center gap-3 shrink-0">
-                <LatticeLoader
-                  pattern="orbit"
-                  grid={3}
-                  cellSize={5}
-                  gap={2}
-                  fontSize={12}
-                  color="#3B82F6"
-                  doneColor="#10B981"
-                  errorColor="#EF4444"
-                  label={selectedExp.status === 'preparing' ? 'Preparing' : selectedExp.status === 'paused' ? 'Paused' : 'Training'}
-                  doneLabel="Completed"
-                  errorLabel={selectedExp.status === 'cancelled' ? 'Cancelled' : 'Failed'}
-                  status={
-                    selectedExp.status === 'completed'
-                      ? 'done'
-                      : selectedExp.status === 'failed' || selectedExp.status === 'cancelled'
-                        ? 'error'
-                        : 'working'
+                <AiOrb
+                  state={mapExperimentStatusToOrbState(selectedExp.status)}
+                  size="md"
+                  showLabel
+                  label={
+                    selectedExp.status === 'preparing'
+                      ? 'Preparing'
+                      : selectedExp.status === 'running'
+                        ? 'Training'
+                        : selectedExp.status === 'paused'
+                          ? 'Paused'
+                          : selectedExp.status === 'completed'
+                            ? 'Completed'
+                            : selectedExp.status === 'cancelled'
+                              ? 'Cancelled'
+                              : 'Failed'
                   }
                 />
                 {selectedExp.status === 'running' && (
@@ -382,10 +400,15 @@ export function TrainingMonitorView({
 
           {/* Live Charts */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] p-5">
-              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">
-                Training &amp; Validation Loss
-              </h3>
+            <div className="liquid-glass-surface rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white/90 dark:bg-[#11141C]/88 p-5">
+              <div className="mb-3">
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  Training &amp; Validation Loss
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Lower loss = better fit. Both Train (blue) and Validation (green) should decrease together; rising Val Loss signals overfitting.
+                </p>
+              </div>
               <div className="h-64 w-full min-w-0">
                 <ResponsiveContainer
                   width="100%"
@@ -394,21 +417,36 @@ export function TrainingMonitorView({
                   minHeight={256}
                   initialDimension={{ width: 480, height: 256 }}
                 >
-                  <LineChart data={metrics}>
+                  <LineChart data={metrics} margin={{ top: 8, right: 12, left: 0, bottom: 2 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.14)" />
-                    <XAxis dataKey="step" tick={{ fontSize: 11, fill: '#94A3B8' }} />
-                    <YAxis tick={{ fontSize: 11, fill: '#94A3B8' }} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#11141C',
-                        borderColor: 'rgba(255,255,255,0.1)',
-                        borderRadius: '8px',
-                        fontSize: '12px',
-                        color: '#F8FAFC',
-                      }}
-                      itemStyle={{ color: '#E2E8F0' }}
-                      labelStyle={{ color: '#94A3B8', marginBottom: '4px' }}
+                    <XAxis
+                      dataKey="step"
+                      tickFormatter={(v) => `S${v}`}
+                      tick={{ fontSize: 11, fill: '#94A3B8' }}
                     />
+                    <YAxis width={42} tick={{ fontSize: 11, fill: '#94A3B8' }} />
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null;
+                        const pt = payload[0].payload as TrainingMetricPoint;
+                        return (
+                          <div className="rounded-lg border border-white/15 bg-[#11141C]/95 px-3 py-2 text-xs text-slate-100 shadow-lg backdrop-blur-md space-y-0.5">
+                            <div className="font-semibold text-slate-200">
+                              Step {pt.step} · Epoch {pt.epoch}
+                            </div>
+                            <div className="font-mono text-blue-300">
+                              Train Loss: {pt.trainLoss.toFixed(4)}
+                            </div>
+                            {pt.valLoss !== null && (
+                              <div className="font-mono text-emerald-400">
+                                Val Loss: {pt.valLoss.toFixed(4)}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '11px' }} />
                     <Line
                       type="monotone"
                       dataKey="trainLoss"
@@ -433,10 +471,15 @@ export function TrainingMonitorView({
               </div>
             </div>
 
-            <div className="rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] p-5">
-              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">
-                Learning Rate Schedule &amp; Process Memory (MB)
-              </h3>
+            <div className="liquid-glass-surface rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white/90 dark:bg-[#11141C]/88 p-5">
+              <div className="mb-3">
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  Learning Rate Schedule &amp; Process Memory (MB)
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Blue curve shows warmup then cosine decay for smooth convergence; purple line tracks trainer RAM footprint.
+                </p>
+              </div>
               <div className="h-64 w-full min-w-0">
                 <ResponsiveContainer
                   width="100%"
@@ -445,22 +488,46 @@ export function TrainingMonitorView({
                   minHeight={256}
                   initialDimension={{ width: 480, height: 256 }}
                 >
-                  <AreaChart data={metrics}>
+                  <AreaChart data={metrics} margin={{ top: 8, right: 10, left: 0, bottom: 2 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.14)" />
-                    <XAxis dataKey="step" tick={{ fontSize: 11, fill: '#94A3B8' }} />
-                    <YAxis yAxisId="left" tick={{ fontSize: 11, fill: '#94A3B8' }} />
-                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: '#94A3B8' }} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#11141C',
-                        borderColor: 'rgba(255,255,255,0.1)',
-                        borderRadius: '8px',
-                        fontSize: '12px',
-                        color: '#F8FAFC',
-                      }}
-                      itemStyle={{ color: '#E2E8F0' }}
-                      labelStyle={{ color: '#94A3B8', marginBottom: '4px' }}
+                    <XAxis
+                      dataKey="step"
+                      tickFormatter={(v) => `S${v}`}
+                      tick={{ fontSize: 11, fill: '#94A3B8' }}
                     />
+                    <YAxis
+                      yAxisId="left"
+                      width={52}
+                      tickFormatter={(v) => Number(v).toExponential(0)}
+                      tick={{ fontSize: 10, fill: '#94A3B8' }}
+                    />
+                    <YAxis
+                      yAxisId="right"
+                      orientation="right"
+                      width={46}
+                      tickFormatter={(v) => `${v}MB`}
+                      tick={{ fontSize: 10, fill: '#94A3B8' }}
+                    />
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null;
+                        const pt = payload[0].payload as TrainingMetricPoint;
+                        return (
+                          <div className="rounded-lg border border-white/15 bg-[#11141C]/95 px-3 py-2 text-xs text-slate-100 shadow-lg backdrop-blur-md space-y-0.5">
+                            <div className="font-semibold text-slate-200">
+                              Step {pt.step} · {pt.tokensPerSec} tok/s
+                            </div>
+                            <div className="font-mono text-sky-300">
+                              Learning Rate: {pt.learningRate.toExponential(2)}
+                            </div>
+                            <div className="font-mono text-purple-300">
+                              Process RSS: {pt.memoryMb} MB
+                            </div>
+                          </div>
+                        );
+                      }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '11px' }} />
                     <Area
                       yAxisId="left"
                       type="monotone"
@@ -487,7 +554,7 @@ export function TrainingMonitorView({
 
           {/* Checkpoints & Streaming Logs */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-5 rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] overflow-hidden">
+            <div className="liquid-glass-surface lg:col-span-5 rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white/90 dark:bg-[#11141C]/88 overflow-hidden">
               <div className="px-5 py-3 border-b border-slate-200 dark:border-white/[0.08]">
                 <h3 className="text-xs font-semibold text-slate-900 dark:text-slate-100">
                   Saved Checkpoints ({checkpoints.length})
@@ -533,7 +600,13 @@ export function TrainingMonitorView({
                 className="p-4 h-64 overflow-y-auto font-mono text-[11px] leading-relaxed space-y-1"
               >
                 {logs.length === 0 ? (
-                  <div className="text-slate-500">Waiting for worker logs...</div>
+                  <div className="text-slate-500">
+                    {selectedExp.status === 'completed' ||
+                    selectedExp.status === 'failed' ||
+                    selectedExp.status === 'cancelled'
+                      ? `No persisted log lines for this ${selectedExp.status} run.`
+                      : 'Waiting for worker logs...'}
+                  </div>
                 ) : (
                   logs.map((line, i) => (
                     <div key={i} className="whitespace-pre-wrap break-all">

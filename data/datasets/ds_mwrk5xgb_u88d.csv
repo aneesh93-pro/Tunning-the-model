@@ -1,0 +1,9 @@
+account_id,tier,region,issue_summary,resolution_code
+A-101,Enterprise,US-East,Wire transfer delayed past cutoff,expedite_wire
+A-102,Growth,EU-West,Card declined on hotel booking,unblock_merchant
+A-103,Starter,APAC,Need duplicate monthly statement PDF,send_statement
+A-104,Enterprise,US-West,SSO login token expires immediately,reset_sso_ttl
+A-105,Growth,US-East,Update billing contact email address,update_billing_email
+A-106,Pro,EU-Central,API webhook signature mismatch 401,rotate_webhook_secret
+A-107,Starter,APAC,Question on foreign exchange markup fee,explain_fx_fee
+A-108,Enterprise,US-East,Request higher daily ACH limit,increase_ach_limit

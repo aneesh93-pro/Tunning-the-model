@@ -15,7 +15,7 @@ interface SiteFooterProps {
   onNavigate: (section: NavSection) => void;
 }
 
-const FOOTER_MAIL = 'mayurianeesh@gmai.com';
+const FOOTER_MAIL = 'mayurianeesh@gmail.com';
 
 const QUICK_LINKS: Array<{ id: NavSection; label: string }> = [
   { id: 'overview', label: 'Overview' },

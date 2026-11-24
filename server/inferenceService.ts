@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { GoogleGenAI, Type } from '@google/genai';
 import { db, logAudit } from './db.ts';
+import { ensureDatasetBundlePrepared } from './datasetBundleService.ts';
 import { loadTrainedEngineFromAdapter } from './trainingManager.ts';
 import { getModelById, PRETRAINED_MODELS } from '../src/ml/modelCatalog.ts';
 import type { ProcessedDatasetBundle } from '../src/ml/datasetProcessor.ts';
@@ -39,6 +40,7 @@ function getGeminiClient(): GoogleGenAI | null {
 export interface InferenceRequest {
   modelRef: string; // e.g. 'base:qwen2.5-0.5b-instruct' or 'reg:<registered_model_id>'
   prompt: string;
+  datasetId?: string;
   systemPrompt?: string;
   choices?: string[] | string;
   history?: Array<{ role: 'user' | 'assistant'; content: string }>;
@@ -103,32 +105,34 @@ function loadDatasetBundle(datasetId?: string): {
   datasetName: string;
   bundle: ProcessedDatasetBundle | null;
 } {
-  let row: Record<string, unknown> | undefined;
-  if (datasetId) {
-    row = db.prepare('SELECT * FROM datasets WHERE id = ?').get(datasetId) as
-      | Record<string, unknown>
-      | undefined;
+  let targetId = datasetId;
+  if (!targetId) {
+    const row = db
+      .prepare(`SELECT id FROM datasets ORDER BY updated_at DESC LIMIT 1`)
+      .get() as { id: string } | undefined;
+    targetId = row?.id;
   }
-  if (!row) {
-    row = db
-      .prepare(`SELECT * FROM datasets WHERE status = 'training_ready' ORDER BY updated_at DESC LIMIT 1`)
-      .get() as Record<string, unknown> | undefined;
-  }
-  if (!row || !row.processed_path || !fs.existsSync(String(row.processed_path))) {
+  if (!targetId) {
     return {
-      datasetId: datasetId || 'default',
+      datasetId: 'default',
       datasetName: 'Workspace Verification Corpus',
       bundle: null,
     };
   }
-  const bundle = JSON.parse(
-    fs.readFileSync(String(row.processed_path), 'utf-8')
-  ) as ProcessedDatasetBundle;
-  return {
-    datasetId: String(row.id),
-    datasetName: String(row.name),
-    bundle,
-  };
+  try {
+    const { datasetRow, bundle } = ensureDatasetBundlePrepared(targetId);
+    return {
+      datasetId: String(datasetRow.id),
+      datasetName: String(datasetRow.name),
+      bundle,
+    };
+  } catch {
+    return {
+      datasetId: targetId,
+      datasetName: 'Workspace Verification Corpus',
+      bundle: null,
+    };
+  }
 }
 
 function runLocalStructuredInference(params: {
@@ -237,7 +241,7 @@ export async function* streamModelInference(req: InferenceRequest): AsyncGenerat
     return;
   }
 
-  const { bundle } = loadDatasetBundle(handle.datasetId);
+  const { bundle } = loadDatasetBundle(req.datasetId ?? handle.datasetId);
   const datasetLabels: string[] =
     handle.engine?.taskType === 'classification'
       ? handle.engine.labels

@@ -28,6 +28,8 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Legend,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -191,7 +193,7 @@ export function OverviewView({ data, loading, onNavigate, onOpenPlayground }: Ov
   return (
     <div className="space-y-6">
       {/* Hero Showcase: TextLoop Website Heading + Interactive DitherVeil Neural Canvas */}
-      <div className="relative overflow-hidden rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C]">
+      <div className="liquid-glass-surface liquid-glass-hero relative overflow-hidden rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white/90 dark:bg-[#11141C]/88">
         <DotGrid />
         <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 items-stretch">
           <div className="lg:col-span-7 p-5 sm:p-6 flex flex-col justify-between gap-4">
@@ -226,14 +228,14 @@ export function OverviewView({ data, loading, onNavigate, onOpenPlayground }: Ov
                     trigger="loop"
                     speed={3.2}
                     delay={1.5}
-                    color="#3B82F6"
-                    shineColor="#93C5FD"
+                    color={isDark ? '#60A5FA' : '#1D4ED8'}
+                    shineColor={isDark ? '#BAE6FD' : '#3B82F6'}
                   />
                 </p>
-                <div className="w-full overflow-hidden py-1">
+                <div className="w-full py-1 pr-2">
                   <TextPressure
                     text="MiniMind AI"
-                    flex
+                    flex={false}
                     alpha={false}
                     stroke={false}
                     width
@@ -246,8 +248,9 @@ export function OverviewView({ data, loading, onNavigate, onOpenPlayground }: Ov
                     clickRipple
                     textColor={isDark ? '#F8FAFC' : '#0F172A'}
                     pressureColor={isDark ? '#60A5FA' : '#2563EB'}
-                    minFontSize={26}
-                    maxFontSize={64}
+                    minFontSize={22}
+                    maxFontSize={50}
+                    className="text-left tracking-[0.06em]"
                   />
                 </div>
                 <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 max-w-2xl">
@@ -322,9 +325,9 @@ export function OverviewView({ data, loading, onNavigate, onOpenPlayground }: Ov
               <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                 <DecryptedText
                   text="About MiniMind AI & Getting Started"
-                  animateOn="inViewHover"
-                  speed={36}
-                  sequential
+                  animateOn="hover"
+                  maxIterations={8}
+                  speed={28}
                   scrambleColor="#3B82F6"
                 />
               </h2>
@@ -351,9 +354,9 @@ export function OverviewView({ data, loading, onNavigate, onOpenPlayground }: Ov
               <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                 <DecryptedText
                   text="Main Aim of This Platform"
-                  animateOn="inViewHover"
-                  speed={36}
-                  sequential
+                  animateOn="hover"
+                  maxIterations={8}
+                  speed={28}
                   scrambleColor="#06B6D4"
                 />
               </h2>
@@ -379,9 +382,9 @@ export function OverviewView({ data, loading, onNavigate, onOpenPlayground }: Ov
               <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                 <DecryptedText
                   text="How to Use MiniMind AI — Practical Example Workflows"
-                  animateOn="inViewHover"
-                  speed={36}
-                  sequential
+                  animateOn="hover"
+                  maxIterations={8}
+                  speed={28}
                   scrambleColor="#3B82F6"
                 />
               </h2>
@@ -525,9 +528,9 @@ export function OverviewView({ data, loading, onNavigate, onOpenPlayground }: Ov
                 <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                   <DecryptedText
                     text="AI Engineer Profile & Workspace Architect"
-                    animateOn="inViewHover"
-                    speed={36}
-                    sequential
+                    animateOn="hover"
+                    maxIterations={8}
+                    speed={28}
                     scrambleColor="#3B82F6"
                   />
                 </h2>
@@ -986,14 +989,14 @@ export function OverviewView({ data, loading, onNavigate, onOpenPlayground }: Ov
 
       {/* Charts Row: Training Activity & Model Performance */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] p-5">
+        <div className="liquid-glass-surface rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white/90 dark:bg-[#11141C]/88 p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                 Training Activity
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Executed training jobs grouped by date
+                Daily completed (blue) vs. failed (red) training runs — tracks workspace reliability over time.
               </p>
             </div>
           </div>
@@ -1025,31 +1028,34 @@ export function OverviewView({ data, loading, onNavigate, onOpenPlayground }: Ov
                 minHeight={224}
                 initialDimension={{ width: 480, height: 224 }}
               >
-                <BarChart data={activityData}>
+                <BarChart data={activityData} margin={{ top: 8, right: 12, left: 0, bottom: 2 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.14)" />
                   <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#94A3B8' }} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#94A3B8' }} />
+                  <YAxis allowDecimals={false} width={36} tick={{ fontSize: 11, fill: '#94A3B8' }} />
                   <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#11141C',
-                      borderColor: 'rgba(255,255,255,0.1)',
-                      borderRadius: '8px',
-                      fontSize: '12px',
-                      color: '#F8FAFC',
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload?.length) return null;
+                      const row = payload[0].payload as { date: string; completed: number; failed: number };
+                      return (
+                        <div className="rounded-lg border border-white/15 bg-[#11141C]/95 px-3 py-2 text-xs text-slate-100 shadow-lg backdrop-blur-md space-y-0.5">
+                          <div className="font-semibold text-slate-200">Date: {label}</div>
+                          <div className="font-mono text-blue-300">Completed runs: {row.completed}</div>
+                          <div className="font-mono text-rose-400">Failed runs: {row.failed}</div>
+                        </div>
+                      );
                     }}
-                    itemStyle={{ color: '#E2E8F0' }}
-                    labelStyle={{ color: '#94A3B8', marginBottom: '4px' }}
                   />
+                  <Legend wrapperStyle={{ fontSize: '11px' }} />
                   <Bar
                     dataKey="completed"
-                    name="Completed"
+                    name="Completed Runs"
                     fill="#3B82F6"
                     radius={[4, 4, 0, 0]}
                     isAnimationActive={false}
                   />
                   <Bar
                     dataKey="failed"
-                    name="Failed"
+                    name="Failed Runs"
                     fill="#DC2626"
                     radius={[4, 4, 0, 0]}
                     isAnimationActive={false}
@@ -1060,14 +1066,14 @@ export function OverviewView({ data, loading, onNavigate, onOpenPlayground }: Ov
           )}
         </div>
 
-        <div className="rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] p-5">
+        <div className="liquid-glass-surface rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white/90 dark:bg-[#11141C]/88 p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                 Model Performance
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Held-out test accuracy / token F1 (%) from Evaluation Center
+                Held-out test accuracy / token F1 (%) — higher bars mean better predictions; 80% is strong quality.
               </p>
             </div>
           </div>
@@ -1099,24 +1105,45 @@ export function OverviewView({ data, loading, onNavigate, onOpenPlayground }: Ov
                 minHeight={224}
                 initialDimension={{ width: 480, height: 224 }}
               >
-                <BarChart data={evalChartData}>
+                <BarChart data={evalChartData} margin={{ top: 8, right: 12, left: 0, bottom: 2 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.14)" />
                   <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#94A3B8' }} />
-                  <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#94A3B8' }} />
+                  <YAxis
+                    domain={[0, 100]}
+                    width={42}
+                    tickFormatter={(v) => `${v}%`}
+                    tick={{ fontSize: 11, fill: '#94A3B8' }}
+                  />
                   <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#11141C',
-                      borderColor: 'rgba(255,255,255,0.1)',
-                      borderRadius: '8px',
-                      fontSize: '12px',
-                      color: '#F8FAFC',
+                    content={({ active, payload }) => {
+                      if (!active || !payload?.length) return null;
+                      const row = payload[0].payload as { name: string; score: number; perplexity: number };
+                      return (
+                        <div className="rounded-lg border border-white/15 bg-[#11141C]/95 px-3 py-2 text-xs text-slate-100 shadow-lg backdrop-blur-md space-y-0.5">
+                          <div className="font-semibold text-cyan-300">{row.name}</div>
+                          <div className="font-mono text-slate-100">Accuracy / F1 Score: {row.score}%</div>
+                          <div className="font-mono text-[11px] text-slate-300">
+                            Perplexity: {row.perplexity} (lower = more confident)
+                          </div>
+                        </div>
+                      );
                     }}
-                    itemStyle={{ color: '#E2E8F0' }}
-                    labelStyle={{ color: '#94A3B8', marginBottom: '4px' }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: '11px' }} />
+                  <ReferenceLine
+                    y={80}
+                    stroke="#10B981"
+                    strokeDasharray="4 4"
+                    label={{
+                      value: '80% Target',
+                      position: 'insideTopRight',
+                      fill: '#10B981',
+                      fontSize: 10,
+                    }}
                   />
                   <Bar
                     dataKey="score"
-                    name="Score (%)"
+                    name="Accuracy / Token F1 (%)"
                     fill="#0EA5E9"
                     radius={[4, 4, 0, 0]}
                     isAnimationActive={false}

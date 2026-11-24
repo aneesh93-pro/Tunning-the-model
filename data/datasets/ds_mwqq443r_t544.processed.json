@@ -1,0 +1,333 @@
+{
+  "format": "instruction",
+  "cleanedRows": [
+    {
+      "instruction": "Classify support ticket priority",
+      "input": "Payment failed twice on checkout and card charged",
+      "output": "urgent_billing"
+    },
+    {
+      "instruction": "Classify support ticket priority",
+      "input": "How do I reset my password from mobile app?",
+      "output": "account_access"
+    },
+    {
+      "instruction": "Classify support ticket priority",
+      "input": "Feature request: export invoices as PDF",
+      "output": "feature_request"
+    },
+    {
+      "instruction": "Classify support ticket priority",
+      "input": "Double charge appeared on my bank statement today",
+      "output": "urgent_billing"
+    },
+    {
+      "instruction": "Classify support ticket priority",
+      "input": "Cannot receive 2FA SMS code when logging in",
+      "output": "account_access"
+    },
+    {
+      "instruction": "Classify support ticket priority",
+      "input": "Add dark mode toggle to billing settings page",
+      "output": "feature_request"
+    },
+    {
+      "instruction": "Classify support ticket priority",
+      "input": "Subscription renewal failed with error 402",
+      "output": "urgent_billing"
+    },
+    {
+      "instruction": "Classify support ticket priority",
+      "input": "Locked out of workspace after email change",
+      "output": "account_access"
+    },
+    {
+      "instruction": "Classify support ticket priority",
+      "input": "Support CSV download in audit dashboard",
+      "output": "feature_request"
+    }
+  ],
+  "examples": [
+    {
+      "id": "ex_0",
+      "hash": "1prjt4x8qoi",
+      "format": "instruction",
+      "promptText": "Classify support ticket priority\nInput: Payment failed twice on checkout and card charged",
+      "targetText": "urgent_billing",
+      "raw": {
+        "instruction": "Classify support ticket priority",
+        "input": "Payment failed twice on checkout and card charged",
+        "output": "urgent_billing"
+      }
+    },
+    {
+      "id": "ex_1",
+      "hash": "1rls2abtxn5",
+      "format": "instruction",
+      "promptText": "Classify support ticket priority\nInput: How do I reset my password from mobile app?",
+      "targetText": "account_access",
+      "raw": {
+        "instruction": "Classify support ticket priority",
+        "input": "How do I reset my password from mobile app?",
+        "output": "account_access"
+      }
+    },
+    {
+      "id": "ex_2",
+      "hash": "1rpszjieatg",
+      "format": "instruction",
+      "promptText": "Classify support ticket priority\nInput: Feature request: export invoices as PDF",
+      "targetText": "feature_request",
+      "raw": {
+        "instruction": "Classify support ticket priority",
+        "input": "Feature request: export invoices as PDF",
+        "output": "feature_request"
+      }
+    },
+    {
+      "id": "ex_3",
+      "hash": "18w1f541298",
+      "format": "instruction",
+      "promptText": "Classify support ticket priority\nInput: Double charge appeared on my bank statement today",
+      "targetText": "urgent_billing",
+      "raw": {
+        "instruction": "Classify support ticket priority",
+        "input": "Double charge appeared on my bank statement today",
+        "output": "urgent_billing"
+      }
+    },
+    {
+      "id": "ex_4",
+      "hash": "7uvfzl0cio",
+      "format": "instruction",
+      "promptText": "Classify support ticket priority\nInput: Cannot receive 2FA SMS code when logging in",
+      "targetText": "account_access",
+      "raw": {
+        "instruction": "Classify support ticket priority",
+        "input": "Cannot receive 2FA SMS code when logging in",
+        "output": "account_access"
+      }
+    },
+    {
+      "id": "ex_5",
+      "hash": "1gfox93clq4",
+      "format": "instruction",
+      "promptText": "Classify support ticket priority\nInput: Add dark mode toggle to billing settings page",
+      "targetText": "feature_request",
+      "raw": {
+        "instruction": "Classify support ticket priority",
+        "input": "Add dark mode toggle to billing settings page",
+        "output": "feature_request"
+      }
+    },
+    {
+      "id": "ex_6",
+      "hash": "17v7vm4dvtu",
+      "format": "instruction",
+      "promptText": "Classify support ticket priority\nInput: Subscription renewal failed with error 402",
+      "targetText": "urgent_billing",
+      "raw": {
+        "instruction": "Classify support ticket priority",
+        "input": "Subscription renewal failed with error 402",
+        "output": "urgent_billing"
+      }
+    },
+    {
+      "id": "ex_7",
+      "hash": "12otkoqobgo",
+      "format": "instruction",
+      "promptText": "Classify support ticket priority\nInput: Locked out of workspace after email change",
+      "targetText": "account_access",
+      "raw": {
+        "instruction": "Classify support ticket priority",
+        "input": "Locked out of workspace after email change",
+        "output": "account_access"
+      }
+    },
+    {
+      "id": "ex_8",
+      "hash": "1k9rmq5v5nj",
+      "format": "instruction",
+      "promptText": "Classify support ticket priority\nInput: Support CSV download in audit dashboard",
+      "targetText": "feature_request",
+      "raw": {
+        "instruction": "Classify support ticket priority",
+        "input": "Support CSV download in audit dashboard",
+        "output": "feature_request"
+      }
+    }
+  ],
+  "train": [
+    {
+      "id": "ex_8",
+      "hash": "1k9rmq5v5nj",
+      "format": "instruction",
+      "promptText": "Classify support ticket priority\nInput: Support CSV download in audit dashboard",
+      "targetText": "feature_request",
+      "raw": {
+        "instruction": "Classify support ticket priority",
+        "input": "Support CSV download in audit dashboard",
+        "output": "feature_request"
+      }
+    },
+    {
+      "id": "ex_1",
+      "hash": "1rls2abtxn5",
+      "format": "instruction",
+      "promptText": "Classify support ticket priority\nInput: How do I reset my password from mobile app?",
+      "targetText": "account_access",
+      "raw": {
+        "instruction": "Classify support ticket priority",
+        "input": "How do I reset my password from mobile app?",
+        "output": "account_access"
+      }
+    },
+    {
+      "id": "ex_6",
+      "hash": "17v7vm4dvtu",
+      "format": "instruction",
+      "promptText": "Classify support ticket priority\nInput: Subscription renewal failed with error 402",
+      "targetText": "urgent_billing",
+      "raw": {
+        "instruction": "Classify support ticket priority",
+        "input": "Subscription renewal failed with error 402",
+        "output": "urgent_billing"
+      }
+    }
+  ],
+  "validation": [
+    {
+      "id": "ex_4",
+      "hash": "7uvfzl0cio",
+      "format": "instruction",
+      "promptText": "Classify support ticket priority\nInput: Cannot receive 2FA SMS code when logging in",
+      "targetText": "account_access",
+      "raw": {
+        "instruction": "Classify support ticket priority",
+        "input": "Cannot receive 2FA SMS code when logging in",
+        "output": "account_access"
+      }
+    },
+    {
+      "id": "ex_0",
+      "hash": "1prjt4x8qoi",
+      "format": "instruction",
+      "promptText": "Classify support ticket priority\nInput: Payment failed twice on checkout and card charged",
+      "targetText": "urgent_billing",
+      "raw": {
+        "instruction": "Classify support ticket priority",
+        "input": "Payment failed twice on checkout and card charged",
+        "output": "urgent_billing"
+      }
+    },
+    {
+      "id": "ex_5",
+      "hash": "1gfox93clq4",
+      "format": "instruction",
+      "promptText": "Classify support ticket priority\nInput: Add dark mode toggle to billing settings page",
+      "targetText": "feature_request",
+      "raw": {
+        "instruction": "Classify support ticket priority",
+        "input": "Add dark mode toggle to billing settings page",
+        "output": "feature_request"
+      }
+    }
+  ],
+  "test": [
+    {
+      "id": "ex_2",
+      "hash": "1rpszjieatg",
+      "format": "instruction",
+      "promptText": "Classify support ticket priority\nInput: Feature request: export invoices as PDF",
+      "targetText": "feature_request",
+      "raw": {
+        "instruction": "Classify support ticket priority",
+        "input": "Feature request: export invoices as PDF",
+        "output": "feature_request"
+      }
+    },
+    {
+      "id": "ex_7",
+      "hash": "12otkoqobgo",
+      "format": "instruction",
+      "promptText": "Classify support ticket priority\nInput: Locked out of workspace after email change",
+      "targetText": "account_access",
+      "raw": {
+        "instruction": "Classify support ticket priority",
+        "input": "Locked out of workspace after email change",
+        "output": "account_access"
+      }
+    },
+    {
+      "id": "ex_3",
+      "hash": "18w1f541298",
+      "format": "instruction",
+      "promptText": "Classify support ticket priority\nInput: Double charge appeared on my bank statement today",
+      "targetText": "urgent_billing",
+      "raw": {
+        "instruction": "Classify support ticket priority",
+        "input": "Double charge appeared on my bank statement today",
+        "output": "urgent_billing"
+      }
+    }
+  ],
+  "splits": {
+    "trainCount": 3,
+    "valCount": 3,
+    "testCount": 3,
+    "trainRatio": 0.7,
+    "valRatio": 0.15,
+    "testRatio": 0.15,
+    "leakageFree": true
+  },
+  "report": {
+    "valid": true,
+    "format": "instruction",
+    "rowCount": 9,
+    "columnCount": 3,
+    "missingValuesTotal": 0,
+    "duplicateCount": 0,
+    "leakageDetected": false,
+    "overlapCount": 0,
+    "avgTokenEstimate": 35,
+    "maxTokenEstimate": 36,
+    "warnings": [],
+    "errors": [],
+    "columns": [
+      {
+        "name": "instruction",
+        "inferredType": "string",
+        "missingCount": 0,
+        "uniqueCount": 1,
+        "avgLength": 32,
+        "sampleValues": [
+          "Classify support ticket priority"
+        ]
+      },
+      {
+        "name": "input",
+        "inferredType": "string",
+        "missingCount": 0,
+        "uniqueCount": 9,
+        "avgLength": 43,
+        "sampleValues": [
+          "Payment failed twice on checkout and card charged",
+          "How do I reset my password from mobile app?",
+          "Feature request: export invoices as PDF"
+        ]
+      },
+      {
+        "name": "output",
+        "inferredType": "string",
+        "missingCount": 0,
+        "uniqueCount": 3,
+        "avgLength": 14,
+        "sampleValues": [
+          "urgent_billing",
+          "account_access",
+          "feature_request"
+        ]
+      }
+    ]
+  }
+}

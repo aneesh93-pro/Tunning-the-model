@@ -1,0 +1,378 @@
+{
+  "format": "raw_text",
+  "cleanedRows": [
+    {
+      "account_id": "A-101",
+      "tier": "Enterprise",
+      "region": "US-East",
+      "issue_summary": "Wire transfer delayed past cutoff",
+      "resolution_code": "expedite_wire"
+    },
+    {
+      "account_id": "A-102",
+      "tier": "Growth",
+      "region": "EU-West",
+      "issue_summary": "Card declined on hotel booking",
+      "resolution_code": "unblock_merchant"
+    },
+    {
+      "account_id": "A-103",
+      "tier": "Starter",
+      "region": "APAC",
+      "issue_summary": "Need duplicate monthly statement PDF",
+      "resolution_code": "send_statement"
+    },
+    {
+      "account_id": "A-104",
+      "tier": "Enterprise",
+      "region": "US-West",
+      "issue_summary": "SSO login token expires immediately",
+      "resolution_code": "reset_sso_ttl"
+    },
+    {
+      "account_id": "A-105",
+      "tier": "Growth",
+      "region": "US-East",
+      "issue_summary": "Update billing contact email address",
+      "resolution_code": "update_billing_email"
+    },
+    {
+      "account_id": "A-106",
+      "tier": "Pro",
+      "region": "EU-Central",
+      "issue_summary": "API webhook signature mismatch 401",
+      "resolution_code": "rotate_webhook_secret"
+    },
+    {
+      "account_id": "A-107",
+      "tier": "Starter",
+      "region": "APAC",
+      "issue_summary": "Question on foreign exchange markup fee",
+      "resolution_code": "explain_fx_fee"
+    },
+    {
+      "account_id": "A-108",
+      "tier": "Enterprise",
+      "region": "US-East",
+      "issue_summary": "Request higher daily ACH limit",
+      "resolution_code": "increase_ach_limit"
+    }
+  ],
+  "examples": [
+    {
+      "id": "ex_0",
+      "hash": "16oenua7xtv",
+      "format": "raw_text",
+      "promptText": "account_id: A-101 | tier: Enterprise | region: US-East | issue_summary: Wire transfer delayed past cutoff",
+      "targetText": "resolution_code: expedite_wire",
+      "raw": {
+        "account_id": "A-101",
+        "tier": "Enterprise",
+        "region": "US-East",
+        "issue_summary": "Wire transfer delayed past cutoff",
+        "resolution_code": "expedite_wire"
+      }
+    },
+    {
+      "id": "ex_1",
+      "hash": "1k1ov5i5h0z",
+      "format": "raw_text",
+      "promptText": "account_id: A-102 | tier: Growth | region: EU-West | issue_summary: Card declined on hotel booking",
+      "targetText": "resolution_code: unblock_merchant",
+      "raw": {
+        "account_id": "A-102",
+        "tier": "Growth",
+        "region": "EU-West",
+        "issue_summary": "Card declined on hotel booking",
+        "resolution_code": "unblock_merchant"
+      }
+    },
+    {
+      "id": "ex_2",
+      "hash": "1ogmdffwnt2",
+      "format": "raw_text",
+      "promptText": "account_id: A-103 | tier: Starter | region: APAC | issue_summary: Need duplicate monthly statement PDF",
+      "targetText": "resolution_code: send_statement",
+      "raw": {
+        "account_id": "A-103",
+        "tier": "Starter",
+        "region": "APAC",
+        "issue_summary": "Need duplicate monthly statement PDF",
+        "resolution_code": "send_statement"
+      }
+    },
+    {
+      "id": "ex_3",
+      "hash": "2c7v9etr6ph",
+      "format": "raw_text",
+      "promptText": "account_id: A-104 | tier: Enterprise | region: US-West | issue_summary: SSO login token expires immediately",
+      "targetText": "resolution_code: reset_sso_ttl",
+      "raw": {
+        "account_id": "A-104",
+        "tier": "Enterprise",
+        "region": "US-West",
+        "issue_summary": "SSO login token expires immediately",
+        "resolution_code": "reset_sso_ttl"
+      }
+    },
+    {
+      "id": "ex_4",
+      "hash": "89dnshz58g",
+      "format": "raw_text",
+      "promptText": "account_id: A-105 | tier: Growth | region: US-East | issue_summary: Update billing contact email address",
+      "targetText": "resolution_code: update_billing_email",
+      "raw": {
+        "account_id": "A-105",
+        "tier": "Growth",
+        "region": "US-East",
+        "issue_summary": "Update billing contact email address",
+        "resolution_code": "update_billing_email"
+      }
+    },
+    {
+      "id": "ex_5",
+      "hash": "1ifet0f094z",
+      "format": "raw_text",
+      "promptText": "account_id: A-106 | tier: Pro | region: EU-Central | issue_summary: API webhook signature mismatch 401",
+      "targetText": "resolution_code: rotate_webhook_secret",
+      "raw": {
+        "account_id": "A-106",
+        "tier": "Pro",
+        "region": "EU-Central",
+        "issue_summary": "API webhook signature mismatch 401",
+        "resolution_code": "rotate_webhook_secret"
+      }
+    },
+    {
+      "id": "ex_6",
+      "hash": "4f1znaudl0",
+      "format": "raw_text",
+      "promptText": "account_id: A-107 | tier: Starter | region: APAC | issue_summary: Question on foreign exchange markup fee",
+      "targetText": "resolution_code: explain_fx_fee",
+      "raw": {
+        "account_id": "A-107",
+        "tier": "Starter",
+        "region": "APAC",
+        "issue_summary": "Question on foreign exchange markup fee",
+        "resolution_code": "explain_fx_fee"
+      }
+    },
+    {
+      "id": "ex_7",
+      "hash": "18ky1ntmvjw",
+      "format": "raw_text",
+      "promptText": "account_id: A-108 | tier: Enterprise | region: US-East | issue_summary: Request higher daily ACH limit",
+      "targetText": "resolution_code: increase_ach_limit",
+      "raw": {
+        "account_id": "A-108",
+        "tier": "Enterprise",
+        "region": "US-East",
+        "issue_summary": "Request higher daily ACH limit",
+        "resolution_code": "increase_ach_limit"
+      }
+    }
+  ],
+  "train": [
+    {
+      "id": "ex_1",
+      "hash": "1k1ov5i5h0z",
+      "format": "raw_text",
+      "promptText": "account_id: A-102 | tier: Growth | region: EU-West | issue_summary: Card declined on hotel booking",
+      "targetText": "resolution_code: unblock_merchant",
+      "raw": {
+        "account_id": "A-102",
+        "tier": "Growth",
+        "region": "EU-West",
+        "issue_summary": "Card declined on hotel booking",
+        "resolution_code": "unblock_merchant"
+      }
+    },
+    {
+      "id": "ex_5",
+      "hash": "1ifet0f094z",
+      "format": "raw_text",
+      "promptText": "account_id: A-106 | tier: Pro | region: EU-Central | issue_summary: API webhook signature mismatch 401",
+      "targetText": "resolution_code: rotate_webhook_secret",
+      "raw": {
+        "account_id": "A-106",
+        "tier": "Pro",
+        "region": "EU-Central",
+        "issue_summary": "API webhook signature mismatch 401",
+        "resolution_code": "rotate_webhook_secret"
+      }
+    },
+    {
+      "id": "ex_2",
+      "hash": "1ogmdffwnt2",
+      "format": "raw_text",
+      "promptText": "account_id: A-103 | tier: Starter | region: APAC | issue_summary: Need duplicate monthly statement PDF",
+      "targetText": "resolution_code: send_statement",
+      "raw": {
+        "account_id": "A-103",
+        "tier": "Starter",
+        "region": "APAC",
+        "issue_summary": "Need duplicate monthly statement PDF",
+        "resolution_code": "send_statement"
+      }
+    },
+    {
+      "id": "ex_7",
+      "hash": "18ky1ntmvjw",
+      "format": "raw_text",
+      "promptText": "account_id: A-108 | tier: Enterprise | region: US-East | issue_summary: Request higher daily ACH limit",
+      "targetText": "resolution_code: increase_ach_limit",
+      "raw": {
+        "account_id": "A-108",
+        "tier": "Enterprise",
+        "region": "US-East",
+        "issue_summary": "Request higher daily ACH limit",
+        "resolution_code": "increase_ach_limit"
+      }
+    },
+    {
+      "id": "ex_6",
+      "hash": "4f1znaudl0",
+      "format": "raw_text",
+      "promptText": "account_id: A-107 | tier: Starter | region: APAC | issue_summary: Question on foreign exchange markup fee",
+      "targetText": "resolution_code: explain_fx_fee",
+      "raw": {
+        "account_id": "A-107",
+        "tier": "Starter",
+        "region": "APAC",
+        "issue_summary": "Question on foreign exchange markup fee",
+        "resolution_code": "explain_fx_fee"
+      }
+    },
+    {
+      "id": "ex_0",
+      "hash": "16oenua7xtv",
+      "format": "raw_text",
+      "promptText": "account_id: A-101 | tier: Enterprise | region: US-East | issue_summary: Wire transfer delayed past cutoff",
+      "targetText": "resolution_code: expedite_wire",
+      "raw": {
+        "account_id": "A-101",
+        "tier": "Enterprise",
+        "region": "US-East",
+        "issue_summary": "Wire transfer delayed past cutoff",
+        "resolution_code": "expedite_wire"
+      }
+    }
+  ],
+  "validation": [
+    {
+      "id": "ex_3",
+      "hash": "2c7v9etr6ph",
+      "format": "raw_text",
+      "promptText": "account_id: A-104 | tier: Enterprise | region: US-West | issue_summary: SSO login token expires immediately",
+      "targetText": "resolution_code: reset_sso_ttl",
+      "raw": {
+        "account_id": "A-104",
+        "tier": "Enterprise",
+        "region": "US-West",
+        "issue_summary": "SSO login token expires immediately",
+        "resolution_code": "reset_sso_ttl"
+      }
+    }
+  ],
+  "test": [
+    {
+      "id": "ex_4",
+      "hash": "89dnshz58g",
+      "format": "raw_text",
+      "promptText": "account_id: A-105 | tier: Growth | region: US-East | issue_summary: Update billing contact email address",
+      "targetText": "resolution_code: update_billing_email",
+      "raw": {
+        "account_id": "A-105",
+        "tier": "Growth",
+        "region": "US-East",
+        "issue_summary": "Update billing contact email address",
+        "resolution_code": "update_billing_email"
+      }
+    }
+  ],
+  "splits": {
+    "trainCount": 6,
+    "valCount": 1,
+    "testCount": 1,
+    "trainRatio": 0.7,
+    "valRatio": 0.15,
+    "testRatio": 0.15,
+    "leakageFree": true
+  },
+  "report": {
+    "valid": true,
+    "format": "raw_text",
+    "rowCount": 8,
+    "columnCount": 5,
+    "missingValuesTotal": 0,
+    "duplicateCount": 0,
+    "leakageDetected": false,
+    "overlapCount": 0,
+    "avgTokenEstimate": 40,
+    "maxTokenEstimate": 41,
+    "warnings": [],
+    "errors": [],
+    "columns": [
+      {
+        "name": "account_id",
+        "inferredType": "string",
+        "missingCount": 0,
+        "uniqueCount": 8,
+        "avgLength": 5,
+        "sampleValues": [
+          "A-101",
+          "A-102",
+          "A-103"
+        ]
+      },
+      {
+        "name": "tier",
+        "inferredType": "string",
+        "missingCount": 0,
+        "uniqueCount": 4,
+        "avgLength": 7,
+        "sampleValues": [
+          "Enterprise",
+          "Growth",
+          "Starter"
+        ]
+      },
+      {
+        "name": "region",
+        "inferredType": "string",
+        "missingCount": 0,
+        "uniqueCount": 5,
+        "avgLength": 7,
+        "sampleValues": [
+          "US-East",
+          "EU-West",
+          "APAC"
+        ]
+      },
+      {
+        "name": "issue_summary",
+        "inferredType": "string",
+        "missingCount": 0,
+        "uniqueCount": 8,
+        "avgLength": 34,
+        "sampleValues": [
+          "Wire transfer delayed past cutoff",
+          "Card declined on hotel booking",
+          "Need duplicate monthly statement PDF"
+        ]
+      },
+      {
+        "name": "resolution_code",
+        "inferredType": "string",
+        "missingCount": 0,
+        "uniqueCount": 8,
+        "avgLength": 16,
+        "sampleValues": [
+          "expedite_wire",
+          "unblock_merchant",
+          "send_statement"
+        ]
+      }
+    ]
+  }
+}

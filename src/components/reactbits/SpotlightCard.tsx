@@ -38,20 +38,20 @@ type Settings = {
 
 const THEMES: Record<'dark' | 'light', Palette> = {
   dark: {
-    surface: '#11141C',
-    border: 'rgba(255, 255, 255, 0.08)',
-    shadow: 'none',
+    surface: 'rgba(17, 20, 28, 0.86)',
+    border: 'rgba(255, 255, 255, 0.11)',
+    shadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 14px 36px -18px rgba(0, 0, 0, 0.6)',
     light: '#3B82F6',
-    fill: 0.45,
-    edge: 0.85
+    fill: 0.48,
+    edge: 0.9
   },
   light: {
-    surface: '#ffffff',
-    border: 'rgba(15, 23, 42, 0.09)',
-    shadow: '0 1px 2px rgba(15, 23, 42, 0.03)',
+    surface: 'rgba(255, 255, 255, 0.86)',
+    border: 'rgba(15, 23, 42, 0.10)',
+    shadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.85), 0 12px 30px -16px rgba(15, 23, 42, 0.14)',
     light: '#2563EB',
-    fill: 0.22,
-    edge: 0.6
+    fill: 0.24,
+    edge: 0.65
   }
 };
 
@@ -79,7 +79,7 @@ const falloff = (color: string, softness: number) => {
 };
 
 const CARD =
-  'relative isolate overflow-hidden rounded-xl p-5 [background-color:var(--spotlight-card-surface)] [box-shadow:var(--spotlight-card-shadow)]';
+  'relative isolate overflow-hidden rounded-xl p-5 backdrop-blur-xl [background-color:var(--spotlight-card-surface)] [box-shadow:var(--spotlight-card-shadow)] transition-shadow duration-300';
 
 const SpotlightCard = ({
   children,

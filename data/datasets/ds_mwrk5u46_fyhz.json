@@ -1,0 +1,11 @@
+{
+  "columns": ["sku", "category", "rating", "verdict"],
+  "data": [
+    ["MM-10", "compute", 5, "recommended"],
+    ["MM-20", "storage", 4, "standard"],
+    ["MM-30", "networking", 5, "recommended"],
+    ["MM-40", "compute", 3, "review"],
+    ["MM-50", "storage", 5, "recommended"],
+    ["MM-60", "security", 4, "standard"]
+  ]
+}

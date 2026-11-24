@@ -4,7 +4,7 @@ import { createApiRouter } from './routes.ts';
 
 export function createApiApp() {
   const app = express();
-  app.use(express.json({ limit: '12mb' }));
+  app.use(express.json({ limit: '25mb' }));
   app.use('/api', createApiRouter());
   return app;
 }

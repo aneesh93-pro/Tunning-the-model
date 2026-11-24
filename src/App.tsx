@@ -19,11 +19,13 @@ import {
   X,
 } from 'lucide-react';
 import { ClickSpark } from './components/reactbits/ClickSpark';
-import Dock, { type DockItemData } from './components/reactbits/Dock';
+import Dock from './components/reactbits/Dock';
 import GradientASCII from './components/reactbits/GradientASCII';
 import { SiteFooter } from './components/SiteFooter';
 import { WelcomeIntro } from './components/WelcomeIntro';
+import { AiOrb, orbStateFor } from '@/components/ui/ai-orb';
 import { LiquidButton } from '@/components/ui/liquid-glass-button';
+import { UserCursor } from '@/components/ui/user-cursor';
 import { api, type OverviewResponse } from './lib/api';
 import { OverviewView, type NavSection } from './views/OverviewView';
 
@@ -143,60 +145,16 @@ export default function App() {
     if (expId) setActiveExperimentId(expId);
     setSection(target);
     setMobileMenuOpen(false);
+    window.scrollTo({ top: 0, behavior: 'auto' });
   };
 
   const activeNavLabel = NAV_ITEMS.find((n) => n.id === section)?.label ?? 'Overview';
   const notifications = overview?.recentExperiments.slice(0, 4) ?? [];
   const runningJobsCount =
     overview?.recentExperiments.filter((exp) => exp.status === 'running').length ?? 0;
-
-  const getDockMenu = (id: NavSection): DockItemData['menu'] => {
-    if (id === 'studio') {
-      return [
-        { label: 'New LoRA Experiment', onClick: () => handleNavigate('studio') },
-        { label: 'Inspect Datasets', onClick: () => handleNavigate('datasets') },
-        { label: 'Browse Model Hub', onClick: () => handleNavigate('models') },
-      ];
-    }
-    if (id === 'playground') {
-      return [
-        { label: 'Structured Output Playground', onClick: () => handleNavigate('playground') },
-        { label: 'Model Evaluation Center', onClick: () => handleNavigate('evaluation') },
-        { label: 'Side-by-Side Comparison', onClick: () => handleNavigate('comparison') },
-      ];
-    }
-    if (id === 'settings') {
-      return [
-        {
-          label: 'Dark Matte Theme',
-          checked: theme === 'dark',
-          onClick: () => setTheme('dark'),
-        },
-        {
-          label: 'Clean Light Theme',
-          checked: theme === 'light',
-          onClick: () => setTheme('light'),
-        },
-        { separator: true },
-        { label: 'Open Workspace Settings', onClick: () => handleNavigate('settings') },
-      ];
-    }
-    return undefined;
-  };
-
-  const dockItems: DockItemData[] = NAV_ITEMS.flatMap((item, index) => {
-    const entry: DockItemData = {
-      icon: <item.icon className="w-[1em] h-[1em]" />,
-      label: item.label,
-      active: section === item.id,
-      badge: item.id === 'monitor' && runningJobsCount > 0 ? runningJobsCount : undefined,
-      menu: getDockMenu(item.id),
-      onClick: () => handleNavigate(item.id),
-    };
-    if (index === 3 || index === 6) {
-      return [{ separator: true }, entry];
-    }
-    return [entry];
+  const runtimeOrbState = orbStateFor({
+    error: Boolean(overviewError),
+    thinking: runningJobsCount > 0,
   });
 
   return (
@@ -208,6 +166,17 @@ export default function App() {
       duration={340}
       className="min-h-screen"
     >
+    <UserCursor
+      fullScreen
+      name={`Aneesh · ${activeNavLabel}`}
+      color="#000000"
+      directionAwareTilt
+      labelTiltStrength={8}
+      pressScale={0.9}
+      trigger="hover"
+      hideNativeCursor
+      zIndex={70}
+    />
     <WelcomeIntro theme={theme} />
     <div className="min-h-screen flex bg-[#F8FAFC] dark:bg-[#090B10] text-slate-900 dark:text-slate-100 relative overflow-x-clip">
       {/* Global Interactive GradientASCII Horizon Background */}
@@ -239,25 +208,25 @@ export default function App() {
           intro
           lightMode={theme === 'light'}
           dpr={1.5}
-          className="opacity-70 dark:opacity-75"
+          className="opacity-45 dark:opacity-50"
         />
-        <div className="absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-[#F8FAFC]/90 via-[#F8FAFC]/55 to-transparent dark:from-[#090B10]/90 dark:via-[#090B10]/55 dark:to-transparent" />
+        <div className="absolute inset-x-0 top-0 h-60 bg-gradient-to-b from-[#F8FAFC]/95 via-[#F8FAFC]/70 to-transparent dark:from-[#090B10]/95 dark:via-[#090B10]/70 dark:to-transparent" />
       </div>
 
       {/* Desktop Left Dock Rail */}
       <aside
         aria-label="Primary navigation"
-        className="hidden md:flex flex-col shrink-0 w-[78px] border-r border-slate-200/80 dark:border-white/[0.08] bg-white/85 dark:bg-[#0C0F16]/85 backdrop-blur-md sticky top-0 h-screen overflow-visible z-30"
+        className="hidden md:flex flex-col shrink-0 w-[86px] border-r border-slate-200/80 dark:border-white/[0.08] bg-white/80 dark:bg-[#0C0F16]/80 backdrop-blur-xl sticky top-0 h-screen overflow-visible z-30"
       >
         <div
           title={`MiniMind AI · ${workspaceName}`}
-          className="h-14 border-b border-slate-200 dark:border-white/[0.08] flex items-center justify-center shrink-0"
+          className="h-14 border-b border-slate-200/80 dark:border-white/[0.08] flex items-center justify-center shrink-0"
         >
           <button
             type="button"
             aria-label="MiniMind AI Home"
             onClick={() => handleNavigate('overview')}
-            className="w-10 h-10 rounded-xl border border-slate-200 dark:border-white/[0.1] bg-slate-50 dark:bg-white/[0.04] flex items-center justify-center hover:border-blue-500/50 transition-colors overflow-hidden"
+            className="w-10 h-10 rounded-xl border border-slate-200 dark:border-white/[0.12] bg-white/85 dark:bg-white/[0.06] backdrop-blur-md flex items-center justify-center hover:border-blue-500/50 transition-all shadow-sm overflow-hidden"
           >
             <img
               src="/minimind-favicon.svg"
@@ -267,19 +236,31 @@ export default function App() {
           </button>
         </div>
 
-        <nav aria-label="MiniMind AI Dock Navigation" className="flex-1 relative overflow-visible">
+        <nav
+          aria-label="Workspace Dock"
+          className="relative flex-1 overflow-visible"
+        >
           <Dock
-            items={dockItems}
             position="left"
             theme={theme}
-            baseItemSize={36}
-            magnification={52}
-            distance={150}
+            baseItemSize={40}
+            magnification={56}
+            distance={140}
             panelHeight={54}
             gap={6}
-            roundness={0.5}
+            roundness={0.55}
+            showLabels
+            showIndicators
+            showBadges
             accentColor="#3B82F6"
-            badgeColor="#3B82F6"
+            className="!left-1/2 !-translate-x-1/2"
+            items={NAV_ITEMS.map((item) => ({
+              icon: <item.icon className="w-[18px] h-[18px]" />,
+              label: item.label,
+              active: section === item.id,
+              badge: item.id === 'monitor' && runningJobsCount > 0 ? runningJobsCount : undefined,
+              onClick: () => handleNavigate(item.id),
+            }))}
           />
         </nav>
 
@@ -289,7 +270,7 @@ export default function App() {
               ? overview.hardware.gpuName ?? 'GPU Engine'
               : `${overview?.hardware.cpuCores ?? 4} vCPU · CPU Engine`
           }
-          className="py-2.5 border-t border-slate-200 dark:border-white/[0.08] flex flex-col items-center justify-center text-[10px] font-mono text-slate-500 dark:text-slate-400 shrink-0"
+          className="py-2.5 border-t border-slate-200/80 dark:border-white/[0.08] flex flex-col items-center justify-center text-[10px] font-mono text-slate-500 dark:text-slate-400 shrink-0"
         >
           <span className="uppercase tracking-wider">
             {overview?.hardware.gpuAvailable ? 'GPU' : 'CPU'}
@@ -340,17 +321,17 @@ export default function App() {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 relative z-10">
         {/* Top Bar */}
-        <header className="h-14 px-4 sm:px-6 border-b border-slate-200/80 dark:border-white/[0.08] bg-white/85 dark:bg-[#0C0F16]/85 backdrop-blur-md flex items-center justify-between gap-4 sticky top-0 z-30">
-          <div className="flex items-center gap-3 min-w-0">
+        <header className="h-14 px-3 sm:px-6 border-b border-slate-200/80 dark:border-white/[0.08] bg-white/80 dark:bg-[#0C0F16]/80 backdrop-blur-xl flex items-center justify-between gap-2 sm:gap-4 sticky top-0 z-30">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <button
               type="button"
               aria-label="Open navigation menu"
               onClick={() => setMobileMenuOpen(true)}
-              className="md:hidden p-1.5 rounded-md text-slate-500 hover:bg-slate-100 dark:hover:bg-white/[0.05]"
+              className="md:hidden p-1.5 rounded-md text-slate-500 hover:bg-slate-100 dark:hover:bg-white/[0.05] shrink-0"
             >
               <Menu className="w-4 h-4" />
             </button>
-            <div className="flex items-center gap-2 text-xs min-w-0 truncate">
+            <div className="flex items-center gap-2 text-xs min-w-0">
               <span className="text-slate-500 dark:text-slate-400 hidden sm:inline truncate">
                 {workspaceName}
               </span>
@@ -361,12 +342,24 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5 shrink-0">
-            <span className="hidden lg:inline text-xs font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">
-              {overview?.hardware.gpuAvailable
-                ? `GPU: ${overview.hardware.gpuName}`
-                : 'Runtime: CPU LoRA Engine'}
-            </span>
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+            <div
+              title={
+                overviewError
+                  ? 'Runtime attention required'
+                  : runningJobsCount > 0
+                    ? `${runningJobsCount} active fine-tuning run(s)`
+                    : 'Model runtime idle and ready'
+              }
+              className="inline-flex items-center gap-2"
+            >
+              <AiOrb state={runtimeOrbState} size="sm" decorative />
+              <span className="hidden lg:inline text-xs font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                {overview?.hardware.gpuAvailable
+                  ? `GPU: ${overview.hardware.gpuName}`
+                  : 'Runtime: CPU LoRA Engine'}
+              </span>
+            </div>
 
             <div ref={notificationsRef} className="relative">
               <button
@@ -374,7 +367,7 @@ export default function App() {
                 aria-label="Toggle notifications"
                 aria-expanded={showNotifications}
                 onClick={() => setShowNotifications((s) => !s)}
-                className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-white/[0.05]"
+                className="p-1.5 sm:p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-white/[0.05]"
               >
                 <Bell className="w-4 h-4" />
               </button>
@@ -412,7 +405,7 @@ export default function App() {
               type="button"
               aria-label="Toggle color theme"
               onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
-              className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-white/[0.05]"
+              className="p-1.5 sm:p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-white/[0.05]"
             >
               {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
@@ -425,7 +418,8 @@ export default function App() {
               className="shrink-0"
             >
               <Plus className="w-3.5 h-3.5" />
-              New Experiment
+              <span className="hidden sm:inline">New Experiment</span>
+              <span className="sm:hidden">New</span>
             </LiquidButton>
           </div>
         </header>
@@ -464,6 +458,7 @@ export default function App() {
             )}
             {section === 'datasets' && (
               <DatasetManagerView
+                selectedDatasetId={selectedDatasetId}
                 onSelectForTraining={(id) => setSelectedDatasetId(id)}
                 onNavigate={handleNavigate}
               />
@@ -482,6 +477,7 @@ export default function App() {
             {section === 'studio' && (
               <FineTuningStudioView
                 initialDatasetId={selectedDatasetId}
+                onSelectDataset={(id) => setSelectedDatasetId(id)}
                 initialModelId={selectedModelId}
                 onTrainingStarted={(expId) => handleNavigate('monitor', expId)}
                 onNavigate={handleNavigate}
@@ -494,12 +490,25 @@ export default function App() {
               />
             )}
             {section === 'playground' && (
-              <ModelPlaygroundView initialModelRef={playgroundModelRef} />
+              <ModelPlaygroundView
+                initialModelRef={playgroundModelRef}
+                initialDatasetId={selectedDatasetId}
+                onSelectDataset={(id) => setSelectedDatasetId(id)}
+              />
             )}
             {section === 'evaluation' && (
-              <EvaluationCenterView onNavigate={handleNavigate} />
+              <EvaluationCenterView
+                initialDatasetId={selectedDatasetId}
+                onSelectDataset={(id) => setSelectedDatasetId(id)}
+                onNavigate={handleNavigate}
+              />
             )}
-            {section === 'comparison' && <ModelComparisonView />}
+            {section === 'comparison' && (
+              <ModelComparisonView
+                initialDatasetId={selectedDatasetId}
+                onSelectDataset={(id) => setSelectedDatasetId(id)}
+              />
+            )}
             {section === 'registry' && (
               <ModelRegistryView
                 onOpenPlayground={(ref) => {

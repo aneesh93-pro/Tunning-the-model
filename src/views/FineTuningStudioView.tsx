@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Cpu, Layers, Play, ShieldAlert } from 'lucide-react';
 import { RubberSegment } from '../components/reactbits/RubberSegment';
+import { AiOrb } from '@/components/ui/ai-orb';
 import { LiquidButton } from '@/components/ui/liquid-glass-button';
 import { api } from '../lib/api';
 import { useIsDark } from '../lib/useDarkMode';
+import { pickPreferredDatasetId } from '../utils/datasetSelection';
 import { estimateTrainingMemory, getModelById, PRETRAINED_MODELS } from '../ml/modelCatalog';
 import { formatDuration, formatNumber } from '../lib/utils';
 import type {
@@ -16,6 +18,7 @@ import type { NavSection } from './OverviewView';
 
 interface FineTuningStudioViewProps {
   initialDatasetId: string | null;
+  onSelectDataset?: (datasetId: string) => void;
   initialModelId: string;
   onTrainingStarted: (experimentId: string) => void;
   onNavigate: (section: NavSection) => void;
@@ -23,6 +26,7 @@ interface FineTuningStudioViewProps {
 
 export function FineTuningStudioView({
   initialDatasetId,
+  onSelectDataset,
   initialModelId,
   onTrainingStarted,
 }: FineTuningStudioViewProps) {
@@ -72,12 +76,8 @@ export function FineTuningStudioView({
       .then(([ds, avail]) => {
         setDatasets(ds);
         setHardware(avail.hardware);
-        const ready = ds.filter((d) => d.status === 'training_ready');
-        if (!datasetId && ready.length > 0) {
-          setDatasetId(ready[0].id);
-        } else if (!datasetId && ds.length > 0) {
-          setDatasetId(ds[0].id);
-        }
+        const preferred = pickPreferredDatasetId(ds, initialDatasetId || datasetId);
+        if (preferred) setDatasetId(preferred);
       })
       .catch((err) => {
         setError((err as Error).message);
@@ -204,41 +204,57 @@ export function FineTuningStudioView({
             Configure LoRA, 4-bit NF4 QLoRA, optimizer schedules, and hardware memory constraints before launching training.
           </p>
         </div>
-        <LiquidButton
-          type="button"
-          variant="default"
-          size="lg"
-          onClick={() => {
-            if (!datasetId) {
-              setError('Select a preprocessed dataset first.');
-              return;
+        <div className="flex items-center gap-3 shrink-0">
+          <AiOrb
+            state={submitting ? 'tool-call' : error ? 'error' : showConfirm ? 'waiting-approval' : 'idle'}
+            size="sm"
+            showLabel
+            label={
+              submitting
+                ? 'Starting job'
+                : error
+                  ? 'Config invalid'
+                  : showConfirm
+                    ? 'Awaiting launch'
+                    : 'Config ready'
             }
-            if (!experimentName.trim()) {
-              setError('Experiment name is required.');
-              return;
-            }
-            if (
-              (method !== 'full' && (!Number.isFinite(loraR) || loraR < 1 || !Number.isFinite(loraAlpha) || loraAlpha < 1)) ||
-              !Number.isFinite(learningRate) ||
-              learningRate <= 0 ||
-              !Number.isFinite(epochs) ||
-              epochs < 1 ||
-              !Number.isFinite(batchSize) ||
-              batchSize < 1 ||
-              !Number.isFinite(maxSeqLength) ||
-              maxSeqLength < 64
-            ) {
-              setError('Enter valid positive numeric hyperparameters (Rank, Alpha, LR, Epochs, Batch Size, Seq Length).');
-              return;
-            }
-            setError(null);
-            setShowConfirm(true);
-          }}
-          className="shrink-0 whitespace-nowrap"
-        >
-          <Play className="w-3.5 h-3.5" />
-          Start Training
-        </LiquidButton>
+          />
+          <LiquidButton
+            type="button"
+            variant="default"
+            size="lg"
+            onClick={() => {
+              if (!datasetId) {
+                setError('Select a preprocessed dataset first.');
+                return;
+              }
+              if (!experimentName.trim()) {
+                setError('Experiment name is required.');
+                return;
+              }
+              if (
+                (method !== 'full' && (!Number.isFinite(loraR) || loraR < 1 || !Number.isFinite(loraAlpha) || loraAlpha < 1)) ||
+                !Number.isFinite(learningRate) ||
+                learningRate <= 0 ||
+                !Number.isFinite(epochs) ||
+                epochs < 1 ||
+                !Number.isFinite(batchSize) ||
+                batchSize < 1 ||
+                !Number.isFinite(maxSeqLength) ||
+                maxSeqLength < 64
+              ) {
+                setError('Enter valid positive numeric hyperparameters (Rank, Alpha, LR, Epochs, Batch Size, Seq Length).');
+                return;
+              }
+              setError(null);
+              setShowConfirm(true);
+            }}
+            className="shrink-0 whitespace-nowrap"
+          >
+            <Play className="w-3.5 h-3.5" />
+            Start Training
+          </LiquidButton>
+        </div>
       </div>
 
       {error && (
@@ -273,13 +289,17 @@ export function FineTuningStudioView({
                   Training Dataset
                 </label>
                 <select
+                  aria-label="Training Dataset"
                   value={datasetId}
-                  onChange={(e) => setDatasetId(e.target.value)}
+                  onChange={(e) => {
+                    setDatasetId(e.target.value);
+                    onSelectDataset?.(e.target.value);
+                  }}
                   className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-white/[0.1] bg-slate-50 dark:bg-[#090B10]"
                 >
                   {datasets.map((d) => (
                     <option key={d.id} value={d.id}>
-                      {d.name} ({d.status})
+                      {d.name} ({d.status === 'training_ready' ? 'ready' : `${d.rowCount} rows · auto-split`})
                     </option>
                   ))}
                 </select>
@@ -344,11 +364,11 @@ export function FineTuningStudioView({
                   thumbColor="#2563EB"
                   textColor={isDark ? '#94A3B8' : '#475569'}
                   activeTextColor="#FFFFFF"
-                  className="w-full border border-slate-200 dark:border-white/[0.08] font-mono uppercase"
+                  className="w-full border border-slate-200 dark:border-white/[0.08] font-mono"
                   items={[
-                    { value: 'lora', label: 'lora' },
-                    { value: 'qlora', label: 'qlora' },
-                    { value: 'full', label: 'full' },
+                    { value: 'lora', label: 'LoRA' },
+                    { value: 'qlora', label: 'QLoRA' },
+                    { value: 'full', label: 'Full' },
                   ]}
                 />
               </div>

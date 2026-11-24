@@ -8,18 +8,38 @@ import {
   ShieldAlert,
   Wrench,
 } from 'lucide-react';
-import { LatticeLoader } from '../components/reactbits/LatticeLoader';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import { AiOrb } from '@/components/ui/ai-orb';
 import { LiquidButton } from '@/components/ui/liquid-glass-button';
+import { mapJobRunnerToOrbState } from '@/utils/aiOrbState';
+import { pickPreferredDatasetId } from '../utils/datasetSelection';
 import { api } from '../lib/api';
 import { analyzeEvaluationRun } from '../ml/evaluationDiagnostics';
 import type { DatasetRecord, EvaluationRunRecord } from '../shared/types';
 import type { NavSection } from './OverviewView';
 
 interface EvaluationCenterViewProps {
+  initialDatasetId?: string | null;
+  onSelectDataset?: (datasetId: string) => void;
   onNavigate?: (section: NavSection) => void;
 }
 
-export function EvaluationCenterView({ onNavigate }: EvaluationCenterViewProps) {
+export function EvaluationCenterView({
+  initialDatasetId,
+  onSelectDataset,
+  onNavigate,
+}: EvaluationCenterViewProps) {
   const [models, setModels] = useState<Array<{ ref: string; label: string; aiTool?: string }>>([]);
   const [datasets, setDatasets] = useState<DatasetRecord[]>([]);
   const [evaluations, setEvaluations] = useState<EvaluationRunRecord[]>([]);
@@ -37,11 +57,16 @@ export function EvaluationCenterView({ onNavigate }: EvaluationCenterViewProps) 
         api.getEvaluations(),
       ]);
       setModels(mRes.models);
-      const readyDs = dsList.filter((d) => d.status === 'training_ready');
-      setDatasets(readyDs);
+      setDatasets(dsList);
       setEvaluations(evalList);
       if (!selectedModelRef && mRes.models.length > 0) setSelectedModelRef(mRes.models[0].ref);
-      if (!selectedDatasetId && readyDs.length > 0) setSelectedDatasetId(readyDs[0].id);
+      const preferredDatasetId = pickPreferredDatasetId(
+        dsList,
+        initialDatasetId || selectedDatasetId
+      );
+      if (preferredDatasetId && preferredDatasetId !== selectedDatasetId) {
+        setSelectedDatasetId(preferredDatasetId);
+      }
       if (!activeEval && evalList.length > 0) setActiveEval(evalList[0]);
     } catch (err) {
       setError((err as Error).message);
@@ -51,6 +76,12 @@ export function EvaluationCenterView({ onNavigate }: EvaluationCenterViewProps) 
   useEffect(() => {
     void loadData();
   }, []);
+
+  useEffect(() => {
+    if (initialDatasetId && datasets.some((d) => d.id === initialDatasetId)) {
+      setSelectedDatasetId(initialDatasetId);
+    }
+  }, [initialDatasetId, datasets]);
 
   const handleRunEval = async () => {
     if (!selectedModelRef || !selectedDatasetId) return;
@@ -72,6 +103,79 @@ export function EvaluationCenterView({ onNavigate }: EvaluationCenterViewProps) 
     [activeEval]
   );
 
+  const scoreChartData = useMemo(() => {
+    if (!activeEval) return [];
+    const passRate =
+      activeEval.testSampleCount > 0
+        ? ((activeEval.testSampleCount - activeEval.invalidOutputCount) / activeEval.testSampleCount) * 100
+        : 100;
+    const avgConfidence =
+      activeEval.samples.length > 0
+        ? (activeEval.samples.reduce((sum, s) => sum + s.confidence, 0) / activeEval.samples.length) * 100
+        : 0;
+
+    if (activeEval.taskType === 'classification') {
+      return [
+        {
+          metric: 'Accuracy',
+          value: Number(((activeEval.accuracy ?? 0) * 100).toFixed(1)),
+          detail: 'Share of held-out prompts predicted accurately',
+          color: '#3B82F6',
+        },
+        {
+          metric: 'Macro F1',
+          value: Number(((activeEval.macroF1 ?? 0) * 100).toFixed(1)),
+          detail: 'Balanced F1 across all classes equally',
+          color: '#0EA5E9',
+        },
+        {
+          metric: 'Weighted F1',
+          value: Number(((activeEval.weightedF1 ?? 0) * 100).toFixed(1)),
+          detail: 'Class-support weighted F1 score',
+          color: '#6366F1',
+        },
+        {
+          metric: 'Precision',
+          value: Number(((activeEval.precision ?? 0) * 100).toFixed(1)),
+          detail: 'How often positive predictions are right',
+          color: '#10B981',
+        },
+        {
+          metric: 'Valid Format',
+          value: Number(passRate.toFixed(1)),
+          detail: 'Outputs passing schema / label constraints',
+          color: '#14B8A6',
+        },
+      ];
+    }
+    return [
+      {
+        metric: 'Exact Match',
+        value: Number(((activeEval.exactMatch ?? 0) * 100).toFixed(1)),
+        detail: 'Exact string matches against target completion',
+        color: '#3B82F6',
+      },
+      {
+        metric: 'Token F1',
+        value: Number(((activeEval.tokenF1 ?? 0) * 100).toFixed(1)),
+        detail: 'Word/token overlap similarity with ground truth',
+        color: '#0EA5E9',
+      },
+      {
+        metric: 'Confidence',
+        value: Number(avgConfidence.toFixed(1)),
+        detail: 'Mean model certainty across test prompts',
+        color: '#6366F1',
+      },
+      {
+        metric: 'Valid Format',
+        value: Number(passRate.toFixed(1)),
+        detail: 'Outputs passing length and schema checks',
+        color: '#10B981',
+      },
+    ];
+  }, [activeEval]);
+
   const modelGroups = [
     'Trained Adapter',
     'NVIDIA NIM',
@@ -87,17 +191,29 @@ export function EvaluationCenterView({ onNavigate }: EvaluationCenterViewProps) 
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
-          Evaluation Center
-        </h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          Benchmark models strictly on held-out test splits, diagnose misclassifications and perplexity spikes, and inspect actionable steps to rectify errors.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
+            Evaluation Center
+          </h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Benchmark models strictly on held-out test splits, diagnose misclassifications and perplexity spikes, and inspect actionable steps to rectify errors.
+          </p>
+        </div>
+        <AiOrb
+          state={mapJobRunnerToOrbState({
+            error,
+            running,
+            hasResult: Boolean(activeEval),
+          })}
+          size="sm"
+          showLabel
+          label={running ? 'Evaluating' : error ? 'Eval error' : activeEval ? 'Report ready' : 'Idle'}
+        />
       </div>
 
       {/* Runner Bar */}
-      <div className="rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] p-5 flex flex-col md:flex-row md:items-end gap-4">
+      <div className="liquid-glass-surface rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white/90 dark:bg-[#11141C]/88 p-5 flex flex-col md:flex-row md:items-end gap-4">
         <div className="flex-1">
           <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
             Model / Fine-Tuned Adapter
@@ -130,12 +246,19 @@ export function EvaluationCenterView({ onNavigate }: EvaluationCenterViewProps) 
           <select
             aria-label="Held-Out Test Dataset"
             value={selectedDatasetId}
-            onChange={(e) => setSelectedDatasetId(e.target.value)}
+            onChange={(e) => {
+              setSelectedDatasetId(e.target.value);
+              onSelectDataset?.(e.target.value);
+            }}
             className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-white/[0.1] bg-slate-50 dark:bg-[#090B10]"
           >
             {datasets.map((d) => (
               <option key={d.id} value={d.id}>
-                {d.name} ({d.splits?.testCount ?? 0} test samples)
+                {d.name} (
+                {d.splits?.testCount
+                  ? `${d.splits.testCount} test samples`
+                  : `${d.rowCount} rows · auto-split`}
+                )
               </option>
             ))}
           </select>
@@ -153,16 +276,11 @@ export function EvaluationCenterView({ onNavigate }: EvaluationCenterViewProps) 
 
       {running && (
         <div className="rounded-xl border border-blue-500/25 bg-blue-500/[0.06] px-4 py-3 flex items-center justify-between">
-          <LatticeLoader
-            pattern="ripple"
-            grid={3}
-            cellSize={5}
-            gap={2}
-            fontSize={12}
-            color="#3B82F6"
-            status="working"
+          <AiOrb
+            state="tool-call"
+            size="md"
+            showLabel
             label="Running held-out test inference & computing F1 / perplexity..."
-            showTimer
           />
         </div>
       )}
@@ -187,11 +305,11 @@ export function EvaluationCenterView({ onNavigate }: EvaluationCenterViewProps) 
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* History Selector */}
-          <div className="lg:col-span-3 rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] overflow-hidden self-start">
+          <div className="liquid-glass-surface lg:col-span-3 rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white/90 dark:bg-[#11141C]/88 overflow-hidden self-start">
             <div className="px-4 py-3 border-b border-slate-200 dark:border-white/[0.08] text-xs font-semibold">
               Evaluation Runs ({evaluations.length})
             </div>
-            <ul className="divide-y divide-slate-200 dark:divide-white/[0.06]">
+            <ul className="divide-y divide-slate-200 dark:divide-white/[0.06] max-h-[520px] overflow-y-auto">
               {evaluations.map((ev) => (
                 <li key={ev.id}>
                   <button
@@ -292,11 +410,90 @@ export function EvaluationCenterView({ onNavigate }: EvaluationCenterViewProps) 
               </div>
             </div>
 
+            {/* Evaluation Score Breakdown Chart */}
+            <div className="liquid-glass-surface rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white/90 dark:bg-[#11141C]/88 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <div>
+                  <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    Evaluation Score Breakdown (%)
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Higher bars indicate stronger held-out test quality; the dashed green line marks the 75% benchmark target.
+                  </p>
+                </div>
+                <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                  {activeEval.modelName} · {activeEval.testSampleCount} test rows
+                </span>
+              </div>
+              <div className="h-60 w-full min-w-0">
+                <ResponsiveContainer
+                  width="100%"
+                  height={240}
+                  minWidth={0}
+                  minHeight={240}
+                  initialDimension={{ width: 480, height: 240 }}
+                >
+                  <BarChart data={scoreChartData} margin={{ top: 10, right: 16, left: 0, bottom: 4 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.14)" />
+                    <XAxis dataKey="metric" tick={{ fontSize: 11, fill: '#94A3B8' }} />
+                    <YAxis
+                      domain={[0, 100]}
+                      width={44}
+                      tickFormatter={(v) => `${v}%`}
+                      tick={{ fontSize: 11, fill: '#94A3B8' }}
+                    />
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null;
+                        const row = payload[0].payload as {
+                          metric: string;
+                          value: number;
+                          detail: string;
+                        };
+                        return (
+                          <div className="rounded-lg border border-white/15 bg-[#11141C]/95 px-3 py-2 text-xs text-slate-100 shadow-lg backdrop-blur-md">
+                            <div className="font-semibold text-blue-300">
+                              {row.metric}: {row.value}%
+                            </div>
+                            <div className="mt-0.5 text-[11px] text-slate-300 max-w-xs">
+                              {row.detail}
+                            </div>
+                          </div>
+                        );
+                      }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '11px' }} />
+                    <ReferenceLine
+                      y={75}
+                      stroke="#10B981"
+                      strokeDasharray="4 4"
+                      label={{
+                        value: '75% Target',
+                        position: 'insideTopLeft',
+                        fill: '#10B981',
+                        fontSize: 10,
+                      }}
+                    />
+                    <Bar
+                      dataKey="value"
+                      name="Measured Score (%)"
+                      radius={[5, 5, 0, 0]}
+                      isAnimationActive={false}
+                    >
+                      {scoreChartData.map((entry) => (
+                        <Cell key={entry.metric} fill={entry.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
             {/* Error Analysis & Way to Rectify Panel */}
             {diagnosis && (
               <section
                 aria-label="Error analysis and rectification"
-                className="rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] p-5 space-y-4"
+                className="liquid-glass-surface rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white/90 dark:bg-[#11141C]/88 p-5 space-y-4"
               >
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-white/[0.06] pb-3">
                   <div className="flex items-center gap-2.5">
@@ -435,10 +632,13 @@ export function EvaluationCenterView({ onNavigate }: EvaluationCenterViewProps) 
 
             {/* Confusion Matrix */}
             {activeEval.confusionMatrix && (
-              <div className="rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] p-5 overflow-x-auto">
-                <h3 className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-3">
+              <div className="liquid-glass-surface rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white/90 dark:bg-[#11141C]/88 p-5 overflow-x-auto">
+                <h3 className="text-xs font-semibold text-slate-900 dark:text-slate-100">
                   Confusion Matrix (Rows = Ground Truth, Columns = Predicted)
                 </h3>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 mb-3">
+                  Blue diagonal cells count accurate predictions; red off-diagonal cells highlight which labels the model confused.
+                </p>
                 <table className="text-xs font-mono tabular-nums border-collapse">
                   <thead>
                     <tr>
@@ -478,7 +678,7 @@ export function EvaluationCenterView({ onNavigate }: EvaluationCenterViewProps) 
             )}
 
             {/* Per-sample inspection */}
-            <div className="rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] overflow-hidden">
+            <div className="liquid-glass-surface rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white/90 dark:bg-[#11141C]/88 overflow-hidden">
               <div className="px-5 py-3 border-b border-slate-200 dark:border-white/[0.08] text-xs font-semibold">
                 Test Sample Predictions ({activeEval.samples.length})
               </div>

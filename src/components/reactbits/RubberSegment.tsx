@@ -154,7 +154,9 @@ const RubberSegment: React.FC<RubberSegmentProps> = ({
     jumpTo(committed.current);
   };
 
-  const listKey = list.map(item => item.value).join('|');
+  const listKey = list
+    .map(item => `${item.value}:${typeof item.label === 'string' || typeof item.label === 'number' ? item.label : ''}`)
+    .join('|');
   useLayoutEffect(() => {
     measure();
     const observer = new ResizeObserver(measure);

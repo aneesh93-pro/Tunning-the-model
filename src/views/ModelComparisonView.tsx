@@ -5,13 +5,16 @@ import {
   BarChart,
   CartesianGrid,
   Legend,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
-import { LatticeLoader } from '../components/reactbits/LatticeLoader';
+import { AiOrb } from '@/components/ui/ai-orb';
 import { LiquidButton } from '@/components/ui/liquid-glass-button';
+import { mapJobRunnerToOrbState } from '@/utils/aiOrbState';
+import { pickPreferredDatasetId } from '../utils/datasetSelection';
 import { api } from '../lib/api';
 import { formatBytes, formatDuration, formatNumber } from '../lib/utils';
 import type { ComparisonModelMeta, DatasetRecord, EvaluationRunRecord } from '../shared/types';
@@ -39,7 +42,15 @@ function formatDeltaPts(a: number, b: number, higherIsBetter = true): { text: st
   };
 }
 
-export function ModelComparisonView() {
+interface ModelComparisonViewProps {
+  initialDatasetId?: string | null;
+  onSelectDataset?: (datasetId: string) => void;
+}
+
+export function ModelComparisonView({
+  initialDatasetId,
+  onSelectDataset,
+}: ModelComparisonViewProps) {
   const [models, setModels] = useState<Array<{ ref: string; label: string; aiTool?: string }>>([]);
   const [datasets, setDatasets] = useState<DatasetRecord[]>([]);
   const [leftRef, setLeftRef] = useState('');
@@ -73,8 +84,7 @@ export function ModelComparisonView() {
     Promise.all([api.getInferenceModels(), api.getDatasets()])
       .then(([mRes, dsList]) => {
         setModels(mRes.models);
-        const ready = dsList.filter((d) => d.status === 'training_ready');
-        setDatasets(ready);
+        setDatasets(dsList);
         const baseDefault =
           mRes.models.find((m) => m.ref.startsWith('base:'))?.ref || mRes.models[0]?.ref || '';
         const tunedDefault =
@@ -83,12 +93,19 @@ export function ModelComparisonView() {
           baseDefault;
         setLeftRef(baseDefault);
         setRightRef(tunedDefault);
-        if (ready.length > 0) setDatasetId(ready[0].id);
+        const preferred = pickPreferredDatasetId(dsList, initialDatasetId);
+        if (preferred) setDatasetId(preferred);
       })
       .catch((err) => {
         setError((err as Error).message);
       });
   }, []);
+
+  useEffect(() => {
+    if (initialDatasetId && datasets.some((d) => d.id === initialDatasetId)) {
+      setDatasetId(initialDatasetId);
+    }
+  }, [initialDatasetId, datasets]);
 
   const handleCompare = async () => {
     if (!leftRef || !rightRef || !datasetId) return;
@@ -190,16 +207,28 @@ export function ModelComparisonView() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
-          Model Comparison
-        </h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          Run deterministic side-by-side benchmarks across Base Models, NVIDIA NIM, Z.ai GLM, Frontier APIs, and LoRA/QLoRA Adapters with real accuracy and memory footprint deltas.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
+            Model Comparison
+          </h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Run deterministic side-by-side benchmarks across Base Models, NVIDIA NIM, Z.ai GLM, Frontier APIs, and LoRA/QLoRA Adapters with real accuracy and memory footprint deltas.
+          </p>
+        </div>
+        <AiOrb
+          state={mapJobRunnerToOrbState({
+            error,
+            running,
+            hasResult: Boolean(comparison),
+          })}
+          size="sm"
+          showLabel
+          label={running ? 'Comparing' : error ? 'Comparison error' : comparison ? 'Benchmark ready' : 'Idle'}
+        />
       </div>
 
-      <div className="rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] p-5 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+      <div className="liquid-glass-surface rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white/90 dark:bg-[#11141C]/88 p-5 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
         <div>
           <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
             Baseline / Model A
@@ -233,12 +262,19 @@ export function ModelComparisonView() {
           <select
             aria-label="Held-Out Test Dataset"
             value={datasetId}
-            onChange={(e) => setDatasetId(e.target.value)}
+            onChange={(e) => {
+              setDatasetId(e.target.value);
+              onSelectDataset?.(e.target.value);
+            }}
             className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-white/[0.1] bg-slate-50 dark:bg-[#090B10]"
           >
             {datasets.map((d) => (
               <option key={d.id} value={d.id}>
-                {d.name} ({d.splits?.testCount ?? 0} test rows)
+                {d.name} (
+                {d.splits?.testCount
+                  ? `${d.splits.testCount} test rows`
+                  : `${d.rowCount} rows · auto-split`}
+                )
               </option>
             ))}
           </select>
@@ -257,16 +293,11 @@ export function ModelComparisonView() {
 
       {running && (
         <div className="rounded-xl border border-blue-500/25 bg-blue-500/[0.06] px-4 py-3">
-          <LatticeLoader
-            pattern="ripple"
-            grid={3}
-            cellSize={5}
-            gap={2}
-            fontSize={12}
-            color="#3B82F6"
-            status="working"
+          <AiOrb
+            state="tool-result"
+            size="md"
+            showLabel
             label="Evaluating Model A vs Model B across identical held-out samples..."
-            showTimer
           />
         </div>
       )}
@@ -288,10 +319,15 @@ export function ModelComparisonView() {
       ) : (
         <>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-5 rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] p-5">
-              <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">
-                Metric Comparison Chart
-              </h2>
+            <div className="liquid-glass-surface lg:col-span-5 rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white/90 dark:bg-[#11141C]/88 p-5">
+              <div className="mb-3">
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  Metric Comparison Chart
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Compare Model B (blue) vs. Model A (slate) on the exact same held-out prompts. Dotted line shows the 80% benchmark.
+                </p>
+              </div>
               <div className="h-72 w-full min-w-0">
                 <ResponsiveContainer
                   width="100%"
@@ -300,22 +336,53 @@ export function ModelComparisonView() {
                   minHeight={288}
                   initialDimension={{ width: 420, height: 288 }}
                 >
-                  <BarChart data={chartData}>
+                  <BarChart data={chartData} margin={{ top: 10, right: 12, left: 0, bottom: 4 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.14)" />
                     <XAxis dataKey="metric" tick={{ fontSize: 11, fill: '#94A3B8' }} />
-                    <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#94A3B8' }} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#11141C',
-                        borderColor: 'rgba(255,255,255,0.1)',
-                        borderRadius: '8px',
-                        fontSize: '12px',
-                        color: '#F8FAFC',
-                      }}
-                      itemStyle={{ color: '#E2E8F0' }}
-                      labelStyle={{ color: '#94A3B8', marginBottom: '4px' }}
+                    <YAxis
+                      domain={[0, 100]}
+                      width={44}
+                      tickFormatter={(v) => `${v}%`}
+                      tick={{ fontSize: 11, fill: '#94A3B8' }}
                     />
-                    <Legend />
+                    <Tooltip
+                      content={({ active, payload, label }) => {
+                        if (!active || !payload?.length) return null;
+                        const row = payload[0].payload as { metric: string; Left: number; Right: number };
+                        const delta = row.Right - row.Left;
+                        return (
+                          <div className="rounded-lg border border-white/15 bg-[#11141C]/95 px-3 py-2 text-xs text-slate-100 shadow-lg backdrop-blur-md space-y-1">
+                            <div className="font-semibold text-slate-200">{label}</div>
+                            <div className="font-mono text-slate-300">
+                              Model A: <span className="text-slate-100 font-semibold">{row.Left}%</span>
+                            </div>
+                            <div className="font-mono text-blue-300">
+                              Model B: <span className="text-blue-200 font-semibold">{row.Right}%</span>
+                            </div>
+                            <div
+                              className={`font-mono text-[11px] pt-0.5 border-t border-white/10 ${
+                                delta >= 0 ? 'text-emerald-400' : 'text-amber-400'
+                              }`}
+                            >
+                              Delta (B - A): {delta > 0 ? '+' : ''}
+                              {delta.toFixed(1)} pts
+                            </div>
+                          </div>
+                        );
+                      }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '11px' }} />
+                    <ReferenceLine
+                      y={80}
+                      stroke="#10B981"
+                      strokeDasharray="4 4"
+                      label={{
+                        value: '80% Benchmark',
+                        position: 'insideTopRight',
+                        fill: '#10B981',
+                        fontSize: 10,
+                      }}
+                    />
                     <Bar
                       dataKey="Left"
                       name={comparison.left.evaluation.modelName}
@@ -335,7 +402,7 @@ export function ModelComparisonView() {
               </div>
             </div>
 
-            <div className="lg:col-span-7 rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] overflow-hidden">
+            <div className="liquid-glass-surface lg:col-span-7 rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white/90 dark:bg-[#11141C]/88 overflow-hidden">
               <div className="px-5 py-3 border-b border-slate-200 dark:border-white/[0.08] flex items-center justify-between text-xs font-semibold">
                 <span>Measured Metrics &amp; Footprint</span>
                 <span className="font-mono font-normal text-slate-500">
@@ -510,7 +577,7 @@ export function ModelComparisonView() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] overflow-hidden">
+          <div className="liquid-glass-surface rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white/90 dark:bg-[#11141C]/88 overflow-hidden">
             <div className="px-5 py-3 border-b border-slate-200 dark:border-white/[0.08] text-xs font-semibold">
               Sample Prediction Differences ({comparison.sampleDiffs.length} test rows)
             </div>

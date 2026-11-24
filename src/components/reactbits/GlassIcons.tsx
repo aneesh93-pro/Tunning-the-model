@@ -647,7 +647,7 @@ export function GlassIcons({
     const states: IconMotionState[] = [];
     const layout = { width: 1, height: 1, margin: 0, dpr: 1, centers: [] as Array<[number, number]> };
     const paint = document.createElement('canvas');
-    const paintContext = paint.getContext('2d');
+    const paintContext = paint.getContext('2d', { willReadFrequently: true });
     let gl: WebGL2RenderingContext | null = canvas.getContext('webgl2', {
       alpha: true,
       premultipliedAlpha: true,

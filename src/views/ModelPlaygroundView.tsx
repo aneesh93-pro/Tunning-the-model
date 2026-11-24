@@ -13,18 +13,19 @@ import {
   MessageSquare,
   Play,
   Send,
-  ShieldCheck,
   Trash2,
   XCircle,
 } from 'lucide-react';
 import Markdown from 'react-markdown';
+import { AiOrb } from '@/components/ui/ai-orb';
 import { LiquidButton } from '@/components/ui/liquid-glass-button';
 import { AquariumChatCanvas } from '../components/reactbits/AquariumChatCanvas';
-import { LatticeLoader } from '../components/reactbits/LatticeLoader';
 import { RubberSegment } from '../components/reactbits/RubberSegment';
 import { api } from '../lib/api';
 import { useIsDark } from '../lib/useDarkMode';
 import { summarizePlaygroundBatchReports } from '../ml/structuredInference';
+import { mapPlaygroundToOrbState } from '@/utils/aiOrbState';
+import { pickPreferredDatasetId } from '../utils/datasetSelection';
 import type {
   DatasetRecord,
   PlaygroundBatchTestSummary,
@@ -48,6 +49,8 @@ const MODEL_GROUPS = [
 
 interface ModelPlaygroundViewProps {
   initialModelRef: string | null;
+  initialDatasetId?: string | null;
+  onSelectDataset?: (datasetId: string) => void;
 }
 
 const CHOICE_PRESETS: Array<{ label: string; value: string }> = [
@@ -201,7 +204,11 @@ function buildBatchMarkdownReport(
   return [...header, ...lines].join('\n');
 }
 
-export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProps) {
+export function ModelPlaygroundView({
+  initialModelRef,
+  initialDatasetId,
+  onSelectDataset,
+}: ModelPlaygroundViewProps) {
   const isDark = useIsDark();
   const [models, setModels] = useState<
     Array<{
@@ -215,7 +222,7 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
   >([]);
   const [datasets, setDatasets] = useState<DatasetRecord[]>([]);
   const [selectedRef, setSelectedRef] = useState('');
-  const [selectedDatasetId, setSelectedDatasetId] = useState('');
+  const [selectedDatasetId, setSelectedDatasetId] = useState(initialDatasetId || '');
   const [suiteMode, setSuiteMode] =
     useState<PlaygroundTestReport['suiteMode']>('dataset_and_probes');
   const [viewMode, setViewMode] = useState<'chat' | 'report' | 'all'>('chat');
@@ -262,10 +269,9 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
     ]).then(([mRes, convs, dsList, repList]) => {
       setModels(mRes.models);
       setConversations(convs);
-      const readyDs = dsList.filter((d) => d.status === 'training_ready');
-      setDatasets(readyDs.length > 0 ? readyDs : dsList);
-      if (readyDs.length > 0) setSelectedDatasetId(readyDs[0].id);
-      else if (dsList.length > 0) setSelectedDatasetId(dsList[0].id);
+      setDatasets(dsList);
+      const nextDatasetId = pickPreferredDatasetId(dsList, initialDatasetId);
+      if (nextDatasetId) setSelectedDatasetId(nextDatasetId);
 
       setReports(repList);
       if (repList.length > 0) setActiveReport(repList[0]);
@@ -278,7 +284,7 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
     }).catch((err) => {
       setReportError((err as Error).message);
     });
-  }, [initialModelRef]);
+  }, [initialModelRef, initialDatasetId]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -318,6 +324,7 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           modelRef: selectedRef,
+          datasetId: selectedDatasetId || undefined,
           prompt: text,
           systemPrompt,
           choices: candidateChoicesInput.trim() || undefined,
@@ -563,6 +570,19 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
     setTimeout(() => setCopiedId(null), 1500);
   };
 
+  const lastMessage = messages[messages.length - 1];
+  const playgroundOrbState = mapPlaygroundToOrbState({
+    error: reportError,
+    lastMessageIsError: Boolean(
+      lastMessage?.role === 'assistant' && lastMessage.content.startsWith('Error:')
+    ),
+    testingModel,
+    testingAllModels,
+    streaming,
+    hasDraftInput: input.trim().length > 0,
+    hasMessages: messages.length > 0,
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
@@ -732,10 +752,10 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
                 System Prompt
               </label>
               <textarea
-                rows={2}
+                rows={3}
                 value={systemPrompt}
                 onChange={(e) => setSystemPrompt(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-white/[0.1] bg-slate-50 dark:bg-[#090B10]"
+                className="w-full px-3 py-2 text-xs leading-relaxed rounded-lg border border-slate-200 dark:border-white/[0.1] bg-slate-50 dark:bg-[#090B10]"
               />
             </div>
 
@@ -794,7 +814,19 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
               <h2 className="text-xs font-semibold text-slate-900 dark:text-slate-100">
                 Diagnostic Test Suite
               </h2>
-              <ShieldCheck className="w-4 h-4 text-blue-500" />
+              <AiOrb
+                state={
+                  testingModel || testingAllModels
+                    ? 'tool-call'
+                    : reportError
+                      ? 'error'
+                      : activeReport
+                        ? 'done'
+                        : 'idle'
+                }
+                size="sm"
+                decorative
+              />
             </div>
             <div>
               <label className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">
@@ -803,12 +835,15 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
               <select
                 aria-label="Benchmark Dataset"
                 value={selectedDatasetId}
-                onChange={(e) => setSelectedDatasetId(e.target.value)}
+                onChange={(e) => {
+                  setSelectedDatasetId(e.target.value);
+                  onSelectDataset?.(e.target.value);
+                }}
                 className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-white/[0.1] bg-slate-50 dark:bg-[#090B10]"
               >
                 {datasets.map((d) => (
                   <option key={d.id} value={d.id}>
-                    {d.name}
+                    {d.name} ({d.status === 'training_ready' ? 'ready' : `${d.rowCount} rows · auto-split`})
                   </option>
                 ))}
               </select>
@@ -910,23 +945,24 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
         <div className="lg:col-span-8 min-w-0">
           {viewMode === 'chat' ? (
             <div className="relative flex flex-col rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] overflow-hidden h-[660px]">
-              <div className="relative z-10 backdrop-blur-md bg-white/80 dark:bg-[#0C0F16]/80 px-5 py-3 border-b border-slate-200/70 dark:border-white/[0.08] flex items-center justify-between text-xs">
-                <span className="font-medium text-slate-900 dark:text-slate-100 truncate">
-                  {models.find((m) => m.ref === selectedRef)?.label || 'Select model'}
-                </span>
+              <div className="relative z-10 backdrop-blur-md bg-white/80 dark:bg-[#0C0F16]/80 px-5 py-3 border-b border-slate-200/70 dark:border-white/[0.08] flex items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <AiOrb state={playgroundOrbState} size="sm" decorative />
+                  <span className="font-medium text-slate-900 dark:text-slate-100 truncate">
+                    {models.find((m) => m.ref === selectedRef)?.label || 'Select model'}
+                  </span>
+                </div>
                 {streaming ? (
-                  <LatticeLoader
-                    pattern="pulse"
-                    grid={3}
-                    cellSize={4}
-                    gap={2}
-                    fontSize={12}
-                    color="#3B82F6"
-                    status="working"
-                    label="Verifying output"
+                  <AiOrb state="streaming" size="sm" showLabel label="Verifying output" />
+                ) : testingModel || testingAllModels ? (
+                  <AiOrb
+                    state="tool-call"
+                    size="sm"
+                    showLabel
+                    label={testingAllModels ? 'Sweeping all models' : 'Running diagnostic suite'}
                   />
                 ) : (
-                  <span className="font-mono text-slate-600 dark:text-slate-300">
+                  <span className="font-mono text-slate-600 dark:text-slate-300 shrink-0">
                     Boolean · Choice · Score
                   </span>
                 )}
@@ -939,6 +975,9 @@ export function ModelPlaygroundView({ initialModelRef }: ModelPlaygroundViewProp
 
                 {messages.length === 0 ? (
                   <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 text-center pointer-events-none">
+                    <div className="pointer-events-auto mb-3 rounded-full p-1.5 bg-white/35 dark:bg-slate-950/35 backdrop-blur-md border border-white/50 dark:border-white/15 shadow-sm">
+                      <AiOrb state={playgroundOrbState} size="lg" gravity />
+                    </div>
                     <h2 className="text-2xl sm:text-3xl font-normal tracking-tight text-slate-800 dark:text-slate-100 drop-shadow-sm mb-5 select-none">
                       What&apos;s on your mind?
                     </h2>

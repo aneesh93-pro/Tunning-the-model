@@ -1,0 +1,10 @@
+instruction,input,output
+"Classify support ticket priority","Payment failed twice on checkout and card charged","urgent_billing"
+"Classify support ticket priority","How do I reset my password from mobile app?","account_access"
+"Classify support ticket priority","Feature request: export invoices as PDF","feature_request"
+"Classify support ticket priority","Double charge appeared on my bank statement today","urgent_billing"
+"Classify support ticket priority","Cannot receive 2FA SMS code when logging in","account_access"
+"Classify support ticket priority","Add dark mode toggle to billing settings page","feature_request"
+"Classify support ticket priority","Subscription renewal failed with error 402","urgent_billing"
+"Classify support ticket priority","Locked out of workspace after email change","account_access"
+"Classify support ticket priority","Support CSV download in audit dashboard","feature_request"

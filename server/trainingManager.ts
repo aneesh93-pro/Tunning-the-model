@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { ARTIFACTS_DIR, db, logAudit } from './db.ts';
+import { ensureDatasetBundlePrepared } from './datasetBundleService.ts';
 import type { ProcessedDatasetBundle } from '../src/ml/datasetProcessor.ts';
 import { getModelById } from '../src/ml/modelCatalog.ts';
 import {
@@ -129,26 +130,13 @@ tokenizer.save_pretrained("./tokenizer")
 }
 
 export function startTrainingJob(config: TrainingConfig): ExperimentRecord {
-  const dsRow = db
-    .prepare('SELECT id, name, processed_path, raw_path FROM datasets WHERE id = ?')
-    .get(config.datasetId) as
-    | { id: string; name: string; processed_path: string | null; raw_path: string }
-    | undefined;
-  if (!dsRow) {
-    throw new Error(`Dataset "${config.datasetId}" not found.`);
-  }
-  if (!dsRow.processed_path || !fs.existsSync(dsRow.processed_path)) {
-    throw new Error('Dataset has not been preprocessed yet. Run Dataset Manager preprocessing first.');
-  }
+  const { datasetRow: dsRow, bundle } = ensureDatasetBundlePrepared(config.datasetId);
 
   const modelSpec = getModelById(config.modelId);
   if (!modelSpec) {
     throw new Error(`Unsupported base model "${config.modelId}".`);
   }
 
-  const bundle = JSON.parse(
-    fs.readFileSync(dsRow.processed_path, 'utf-8')
-  ) as ProcessedDatasetBundle;
   if (!bundle.train || bundle.train.length === 0) {
     throw new Error('Training split is empty after preprocessing.');
   }

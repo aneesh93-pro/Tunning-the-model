@@ -269,8 +269,9 @@ const TextPressure = ({
     const resize = () => {
       const { width: containerW, height: containerH } =
         container.getBoundingClientRect();
-      const safeDivisor = Math.max(chars.length * 0.85, 1);
-      const computed = chars.length ? containerW / safeDivisor : minFontSize;
+      const usableW = Math.max(containerW - 12, 1);
+      const safeDivisor = Math.max(chars.length * (width ? 1.04 : 0.92), 1);
+      const computed = chars.length ? usableW / safeDivisor : minFontSize;
       const capped =
         typeof maxFontSize === 'number' ? Math.min(computed, maxFontSize) : computed;
       const nextFontSize = Math.max(capped, minFontSize);
@@ -282,7 +283,7 @@ const TextPressure = ({
     const observer = new ResizeObserver(resize);
     observer.observe(container);
     return () => observer.disconnect();
-  }, [chars.length, minFontSize, maxFontSize, scale]);
+  }, [chars.length, minFontSize, maxFontSize, scale, width]);
 
   useEffect(() => {
     const title = titleRef.current;
@@ -439,7 +440,9 @@ const TextPressure = ({
       <h1
         ref={titleRef}
         aria-label={text}
-        className={`text-pressure-title m-0 w-full uppercase text-center whitespace-nowrap select-none cursor-default ${
+        className={`text-pressure-title m-0 w-full uppercase ${
+          className.includes('text-left') || className.includes('text-right') ? '' : 'text-center'
+        } whitespace-nowrap select-none cursor-default ${
           flex ? 'flex justify-between' : ''
         } ${stroke ? 'is-stroke' : ''} ${className}`.trim()}
         style={titleStyle}

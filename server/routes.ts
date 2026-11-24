@@ -5,6 +5,7 @@ import express, { type Request, type Response } from 'express';
 import JSZip from 'jszip';
 import multer from 'multer';
 import { ARTIFACTS_DIR, DATASETS_DIR, db, logAudit } from './db.ts';
+import { ensureDatasetBundlePrepared } from './datasetBundleService.ts';
 import { getGpuWorkerHealth } from './gpuWorkerClient.ts';
 import { getHardwareTelemetry } from './hardware.ts';
 import {
@@ -33,7 +34,6 @@ import {
   type ProcessedDatasetBundle,
   type RawRow,
 } from '../src/ml/datasetProcessor.ts';
-import { buildEngineForDataset } from '../src/ml/loraEngine.ts';
 import {
   computeBaseModelComparisonMeta,
   evaluateBaseModelOnBundle,
@@ -51,8 +51,77 @@ import type {
 const ALLOWED_EXTS = new Set(['csv', 'json', 'jsonl', 'txt', 'tsv', 'ndjson']);
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB limit
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25 MB limit
 });
+
+function handleSingleFileUpload(req: Request, res: Response, next: () => void) {
+  upload.single('file')(req, res, (err: unknown) => {
+    if (err) {
+      const msg =
+        (err as { code?: string })?.code === 'LIMIT_FILE_SIZE'
+          ? 'Uploaded file exceeds the 25 MB limit.'
+          : (err as Error)?.message || 'File upload failed.';
+      res.status(400).json({ error: msg });
+      return;
+    }
+    next();
+  });
+}
+
+function inferDatasetFileType(
+  fileName: string,
+  mimetype: string | undefined,
+  content: string
+): DatasetRecord['fileType'] | null {
+  const parts = fileName.split('.');
+  const rawExt = parts.length > 1 ? (parts.pop() || '').toLowerCase() : '';
+  if (ALLOWED_EXTS.has(rawExt)) {
+    return rawExt as DatasetRecord['fileType'];
+  }
+
+  const mime = (mimetype || '').toLowerCase().split(';')[0].trim();
+  if (mime === 'text/csv' || mime === 'application/csv') return 'csv';
+  if (mime === 'text/tab-separated-values' || mime === 'text/tsv') return 'tsv';
+  if (mime === 'application/x-ndjson' || mime === 'application/jsonl') return 'jsonl';
+  if (mime === 'application/json' || mime === 'text/json') return 'json';
+
+  const trimmed = content.replace(/^[\uFEFF\uFFFE]/, '').trim();
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    try {
+      JSON.parse(trimmed);
+      return 'json';
+    } catch {
+      const lines = trimmed.split(/\r?\n/).filter((l) => l.trim().length > 0);
+      if (lines.length > 1 && lines.every((l) => l.trim().startsWith('{'))) {
+        return 'jsonl';
+      }
+      return 'json';
+    }
+  }
+
+  if (rawExt && !ALLOWED_EXTS.has(rawExt) && mime !== 'text/plain' && mime !== 'application/octet-stream' && mime !== '') {
+    return null;
+  }
+
+  const firstLine = trimmed.split(/\r?\n/, 1)[0] ?? '';
+  if (firstLine.includes('\t')) return 'tsv';
+  if (firstLine.includes(',') || firstLine.includes(';') || firstLine.includes('|')) {
+    return 'csv';
+  }
+  return 'txt';
+}
+
+function sanitizeColumnMapping(raw: unknown): Record<string, string> | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const cleaned: Record<string, string> = {};
+  for (const key of ['instruction', 'input', 'output', 'messages']) {
+    const val = (raw as Record<string, unknown>)[key];
+    if (typeof val === 'string' && val.trim()) {
+      cleaned[key] = val.trim();
+    }
+  }
+  return Object.keys(cleaned).length > 0 ? cleaned : null;
+}
 
 // Simple per-IP in-memory rate limiter for API safety
 const rateMap = new Map<string, { count: number; resetAt: number }>();
@@ -181,16 +250,7 @@ function mapEvaluationRow(row: Record<string, unknown>): EvaluationRunRecord {
 }
 
 function evaluateModelAgainstTestSet(modelRef: string, datasetId: string): EvaluationRunRecord {
-  const dsRow = db
-    .prepare('SELECT id, name, processed_path FROM datasets WHERE id = ?')
-    .get(datasetId) as { id: string; name: string; processed_path: string | null } | undefined;
-  if (!dsRow || !dsRow.processed_path || !fs.existsSync(dsRow.processed_path)) {
-    throw new Error('Selected dataset must be preprocessed with a held-out test split before evaluation.');
-  }
-
-  const bundle = JSON.parse(
-    fs.readFileSync(dsRow.processed_path, 'utf-8')
-  ) as ProcessedDatasetBundle;
+  const { datasetRow: dsRow, bundle } = ensureDatasetBundlePrepared(datasetId);
   if (!bundle.test || bundle.test.length === 0) {
     throw new Error('Dataset test split is empty.');
   }
@@ -353,32 +413,38 @@ export function createApiRouter() {
     res.json(rows.map(mapDatasetRow));
   });
 
-  router.post('/datasets/upload', upload.single('file'), (req, res) => {
+  router.post('/datasets/upload', handleSingleFileUpload, (req, res) => {
     try {
       let name = String(req.body?.name ?? '').trim();
       let fileName = '';
       let content = '';
+      let mimeType: string | undefined;
 
       if (req.file) {
-        fileName = path.basename(req.file.originalname);
+        fileName = path.basename(req.file.originalname || 'uploaded_dataset');
         content = req.file.buffer.toString('utf-8');
+        mimeType = req.file.mimetype;
       } else if (typeof req.body?.content === 'string') {
-        fileName = path.basename(String(req.body.fileName || 'uploaded_dataset.jsonl'));
+        fileName = path.basename(String(req.body.fileName || 'uploaded_dataset'));
         content = req.body.content;
       } else {
         res.status(400).json({ error: 'No dataset file or content provided.' });
         return;
       }
 
-      const ext = (fileName.split('.').pop() || '').toLowerCase();
-      if (!ALLOWED_EXTS.has(ext)) {
+      const fileType = inferDatasetFileType(fileName, mimeType, content);
+      if (!fileType) {
+        const ext = (fileName.split('.').pop() || '').toLowerCase();
         res.status(400).json({ error: `Unsupported file type ".${ext}". Allowed: CSV, TSV, JSON, JSONL, NDJSON, TXT.` });
         return;
       }
-      const fileType = ext as DatasetRecord['fileType'];
+      if (!fileName.includes('.')) {
+        fileName = `${fileName}.${fileType}`;
+      }
+
       const rows = parseDatasetContent(content, fileType);
       if (rows.length === 0) {
-        res.status(400).json({ error: 'Dataset parsed to 0 rows. Check formatting and headers.' });
+        res.status(400).json({ error: 'Dataset parsed to 0 rows. Check formatting and attributes.' });
         return;
       }
 
@@ -418,7 +484,7 @@ export function createApiRouter() {
         now
       );
 
-      logAudit('UPLOAD_DATASET', 'dataset', id, `Uploaded ${fileName} (${rows.length} rows)`);
+      logAudit('UPLOAD_DATASET', 'dataset', id, `Uploaded ${fileName} (${rows.length} rows, ${report.columnCount} attributes)`);
       const inserted = db.prepare('SELECT * FROM datasets WHERE id = ?').get(id) as Record<string, unknown>;
       res.status(201).json(mapDatasetRow(inserted));
     } catch (err) {
@@ -469,19 +535,25 @@ export function createApiRouter() {
       }
       const rawContent = fs.readFileSync(String(row.raw_path), 'utf-8');
       const rawRows = parseDatasetContent(rawContent, row.file_type as DatasetRecord['fileType']);
-      const columnMapping = req.body?.columnMapping ?? null;
-      const report = validateDatasetRows(rawRows, columnMapping);
+      const hasMappingField = Boolean(req.body && Object.prototype.hasOwnProperty.call(req.body, 'columnMapping'));
+      const resolvedMapping = hasMappingField
+        ? sanitizeColumnMapping(req.body.columnMapping)
+        : row.column_mapping_json
+          ? (JSON.parse(String(row.column_mapping_json)) as Record<string, string>)
+          : null;
+      const report = validateDatasetRows(rawRows, resolvedMapping);
       const now = new Date().toISOString();
 
       db.prepare(
-        `UPDATE datasets SET format = ?, status = ?, missing_count = ?, duplicate_count = ?, validation_report_json = ?, column_mapping_json = ?, updated_at = ? WHERE id = ?`
+        `UPDATE datasets SET format = ?, status = ?, column_count = ?, missing_count = ?, duplicate_count = ?, validation_report_json = ?, column_mapping_json = ?, updated_at = ? WHERE id = ?`
       ).run(
         report.format,
         report.valid ? 'validated' : 'uploaded',
+        report.columnCount,
         report.missingValuesTotal,
         report.duplicateCount,
         JSON.stringify(report),
-        columnMapping ? JSON.stringify(columnMapping) : (row.column_mapping_json ? String(row.column_mapping_json) : null),
+        resolvedMapping ? JSON.stringify(resolvedMapping) : null,
         now,
         id
       );
@@ -510,16 +582,23 @@ export function createApiRouter() {
         !Number.isFinite(valRatio) ||
         !Number.isFinite(testRatio) ||
         trainRatio <= 0 ||
-        valRatio <= 0 ||
-        testRatio <= 0 ||
+        valRatio < 0 ||
+        testRatio < 0 ||
         Math.abs(trainRatio + valRatio + testRatio - 1) > 0.02
       ) {
-        res.status(400).json({ error: 'Split ratios must be positive numbers summing to 1.00.' });
+        res.status(400).json({ error: 'Split ratios must be valid percentages (train > 0, val/test >= 0) summing to 1.00.' });
         return;
       }
 
       const rawContent = fs.readFileSync(String(row.raw_path), 'utf-8');
       const rawRows = parseDatasetContent(rawContent, row.file_type as DatasetRecord['fileType']);
+      const hasMappingField = Boolean(req.body && Object.prototype.hasOwnProperty.call(req.body, 'columnMapping'));
+      const resolvedMapping = hasMappingField
+        ? sanitizeColumnMapping(req.body.columnMapping)
+        : row.column_mapping_json
+          ? (JSON.parse(String(row.column_mapping_json)) as Record<string, string>)
+          : null;
+
       const bundle = preprocessAndSplitDataset(rawRows, {
         trainRatio,
         valRatio,
@@ -527,25 +606,33 @@ export function createApiRouter() {
         deduplicate: req.body?.deduplicate !== false,
         dropMissing: req.body?.dropMissing !== false,
         seed: Number.isFinite(Number(req.body?.seed)) ? Number(req.body?.seed) : 42,
-        columnMapping: req.body?.columnMapping ?? (row.column_mapping_json ? JSON.parse(String(row.column_mapping_json)) : null),
+        columnMapping: resolvedMapping,
       });
+
+      if (bundle.examples.length === 0) {
+        res.status(400).json({
+          error: 'Preprocessing produced 0 usable examples. Check dataset content or disable strict missing-row dropping.',
+        });
+        return;
+      }
 
       const procPath = path.join(DATASETS_DIR, `${id}.processed.json`);
       fs.writeFileSync(procPath, JSON.stringify(bundle, null, 2), 'utf-8');
       const now = new Date().toISOString();
 
       db.prepare(
-        `UPDATE datasets SET format = ?, status = ?, row_count = ?, missing_count = ?, duplicate_count = ?,
+        `UPDATE datasets SET format = ?, status = ?, row_count = ?, column_count = ?, missing_count = ?, duplicate_count = ?,
          validation_report_json = ?, splits_json = ?, column_mapping_json = ?, processed_path = ?, updated_at = ? WHERE id = ?`
       ).run(
         bundle.format,
         'training_ready',
         bundle.examples.length,
+        bundle.report.columnCount,
         bundle.report.missingValuesTotal,
         bundle.report.duplicateCount,
         JSON.stringify(bundle.report),
         JSON.stringify(bundle.splits),
-        req.body?.columnMapping ? JSON.stringify(req.body.columnMapping) : (row.column_mapping_json ? String(row.column_mapping_json) : null),
+        resolvedMapping ? JSON.stringify(resolvedMapping) : null,
         procPath,
         now,
         id
@@ -1171,6 +1258,7 @@ export function createApiRouter() {
       for await (const chunk of streamModelInference({
         modelRef,
         prompt,
+        datasetId: req.body?.datasetId ? String(req.body.datasetId) : undefined,
         systemPrompt: req.body?.systemPrompt,
         choices: req.body?.choices,
         history: req.body?.history,
