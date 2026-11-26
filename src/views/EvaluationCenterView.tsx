@@ -78,8 +78,18 @@ export function EvaluationCenterView({
   }, []);
 
   useEffect(() => {
-    if (initialDatasetId && datasets.some((d) => d.id === initialDatasetId)) {
+    if (!initialDatasetId) return;
+    if (datasets.some((d) => d.id === initialDatasetId)) {
       setSelectedDatasetId(initialDatasetId);
+    } else {
+      api
+        .getDatasets()
+        .then((dsList) => {
+          setDatasets(dsList);
+          const resolved = pickPreferredDatasetId(dsList, initialDatasetId);
+          if (resolved) setSelectedDatasetId(resolved);
+        })
+        .catch(() => undefined);
     }
   }, [initialDatasetId, datasets]);
 

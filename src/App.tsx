@@ -16,6 +16,7 @@ import {
   Settings,
   SquareTerminal,
   Sun,
+  Upload,
   X,
 } from 'lucide-react';
 import { ClickSpark } from './components/reactbits/ClickSpark';
@@ -27,6 +28,12 @@ import { AiOrb, orbStateFor } from '@/components/ui/ai-orb';
 import { LiquidButton } from '@/components/ui/liquid-glass-button';
 import { UserCursor } from '@/components/ui/user-cursor';
 import { api, type OverviewResponse } from './lib/api';
+import type { DatasetRecord } from './shared/types';
+import {
+  pickPreferredDatasetId,
+  readStoredActiveDatasetId,
+  writeStoredActiveDatasetId,
+} from './utils/datasetSelection';
 import { OverviewView, type NavSection } from './views/OverviewView';
 
 const DatasetManagerView = lazy(() =>
@@ -83,20 +90,42 @@ export default function App() {
   const [overviewLoading, setOverviewLoading] = useState(true);
   const [workspaceName, setWorkspaceName] = useState('Core SLM Research Lab');
 
-  const [selectedDatasetId, setSelectedDatasetId] = useState<string | null>(null);
+  const [datasets, setDatasets] = useState<DatasetRecord[]>([]);
+  const [selectedDatasetId, setSelectedDatasetIdState] = useState<string | null>(() =>
+    readStoredActiveDatasetId()
+  );
   const [selectedModelId, setSelectedModelId] = useState<string>('qwen2.5-0.5b-instruct');
   const [activeExperimentId, setActiveExperimentId] = useState<string | null>(null);
   const [playgroundModelRef, setPlaygroundModelRef] = useState<string | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
   const [overviewError, setOverviewError] = useState<string | null>(null);
+  const [importingDataset, setImportingDataset] = useState(false);
   const notificationsRef = useRef<HTMLDivElement>(null);
+  const headerFileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const loadOverview = async () => {
+  const selectActiveDataset = (id: string | null) => {
+    const clean = id && id.trim() ? id.trim() : null;
+    setSelectedDatasetIdState(clean);
+    writeStoredActiveDatasetId(clean);
+  };
+
+  const loadWorkspaceData = async (preferredDatasetId?: string | null) => {
     setOverviewLoading(true);
     try {
-      const [ov, settings] = await Promise.all([api.getOverview(), api.getSettings()]);
+      const [ov, settings, dsList] = await Promise.all([
+        api.getOverview(),
+        api.getSettings(),
+        api.getDatasets(),
+      ]);
       setOverview(ov);
       setWorkspaceName(settings.workspace.name);
+      setDatasets(dsList);
+      setSelectedDatasetIdState((prev) => {
+        const resolved = pickPreferredDatasetId(dsList, preferredDatasetId ?? prev);
+        const nextId = resolved || null;
+        writeStoredActiveDatasetId(nextId);
+        return nextId;
+      });
       setOverviewError(null);
     } catch (err) {
       setOverviewError((err as Error).message);
@@ -106,8 +135,22 @@ export default function App() {
   };
 
   useEffect(() => {
-    void loadOverview();
+    void loadWorkspaceData();
   }, [section]);
+
+  const handleGlobalFileImport = async (file: File) => {
+    setImportingDataset(true);
+    setOverviewError(null);
+    try {
+      const created = await api.uploadDatasetFile(file);
+      selectActiveDataset(created.id);
+      await loadWorkspaceData(created.id);
+    } catch (err) {
+      setOverviewError((err as Error).message);
+    } finally {
+      setImportingDataset(false);
+    }
+  };
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -149,12 +192,14 @@ export default function App() {
   };
 
   const activeNavLabel = NAV_ITEMS.find((n) => n.id === section)?.label ?? 'Overview';
+  const activeDataset =
+    datasets.find((d) => d.id === selectedDatasetId) ?? datasets[0] ?? null;
   const notifications = overview?.recentExperiments.slice(0, 4) ?? [];
   const runningJobsCount =
     overview?.recentExperiments.filter((exp) => exp.status === 'running').length ?? 0;
   const runtimeOrbState = orbStateFor({
     error: Boolean(overviewError),
-    thinking: runningJobsCount > 0,
+    thinking: runningJobsCount > 0 || importingDataset,
   });
 
   return (
@@ -343,6 +388,46 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+            {datasets.length > 0 && (
+              <div className="hidden md:flex items-center gap-1.5 rounded-lg border border-slate-200/90 dark:border-white/[0.1] bg-slate-50/90 dark:bg-[#11141C]/90 px-2 py-1">
+                <Database className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                <select
+                  aria-label="Active workspace dataset"
+                  value={activeDataset?.id ?? ''}
+                  onChange={(e) => selectActiveDataset(e.target.value)}
+                  className="max-w-[165px] truncate bg-transparent text-xs font-medium text-slate-800 dark:text-slate-100 focus:outline-none"
+                >
+                  {datasets.map((ds) => (
+                    <option key={ds.id} value={ds.id} className="bg-white dark:bg-[#11141C]">
+                      {ds.name} ({ds.rowCount})
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  title="Import dataset to use across all modules"
+                  aria-label="Quick import dataset"
+                  disabled={importingDataset}
+                  onClick={() => headerFileInputRef.current?.click()}
+                  className="p-1 rounded-md text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 hover:bg-white dark:hover:bg-white/[0.06] transition-colors"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                </button>
+                <input
+                  ref={headerFileInputRef}
+                  type="file"
+                  accept=".csv,.tsv,.json,.jsonl,.ndjson,.txt,text/csv,text/tab-separated-values,application/json,text/plain"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) void handleGlobalFileImport(f);
+                    e.target.value = '';
+                  }}
+                  className="sr-only"
+                  aria-label="Quick import dataset file"
+                />
+              </div>
+            )}
+
             <div
               title={
                 overviewError
@@ -449,6 +534,10 @@ export default function App() {
               <OverviewView
                 data={overview}
                 loading={overviewLoading}
+                activeDataset={activeDataset}
+                datasets={datasets}
+                onSelectDataset={(id) => selectActiveDataset(id)}
+                onImportDataset={handleGlobalFileImport}
                 onNavigate={handleNavigate}
                 onOpenPlayground={(ref) => {
                   setPlaygroundModelRef(ref);
@@ -459,13 +548,15 @@ export default function App() {
             {section === 'datasets' && (
               <DatasetManagerView
                 selectedDatasetId={selectedDatasetId}
-                onSelectForTraining={(id) => setSelectedDatasetId(id)}
+                onSelectForTraining={(id) => selectActiveDataset(id || null)}
+                onDatasetsChanged={(preferredId) => void loadWorkspaceData(preferredId)}
                 onNavigate={handleNavigate}
               />
             )}
             {section === 'models' && (
               <ModelHubView
                 selectedModelId={selectedModelId}
+                activeDataset={activeDataset}
                 onSelectModel={(id) => setSelectedModelId(id)}
                 onTestInPlayground={(modelId) => {
                   setPlaygroundModelRef(`base:${modelId}`);
@@ -477,7 +568,11 @@ export default function App() {
             {section === 'studio' && (
               <FineTuningStudioView
                 initialDatasetId={selectedDatasetId}
-                onSelectDataset={(id) => setSelectedDatasetId(id)}
+                onSelectDataset={(id) => selectActiveDataset(id || null)}
+                onDatasetImported={(ds) => {
+                  selectActiveDataset(ds.id);
+                  void loadWorkspaceData(ds.id);
+                }}
                 initialModelId={selectedModelId}
                 onTrainingStarted={(expId) => handleNavigate('monitor', expId)}
                 onNavigate={handleNavigate}
@@ -486,31 +581,34 @@ export default function App() {
             {section === 'monitor' && (
               <TrainingMonitorView
                 activeExperimentId={activeExperimentId}
+                activeDataset={activeDataset}
                 onSelectExperiment={(id) => setActiveExperimentId(id)}
+                onNavigate={handleNavigate}
               />
             )}
             {section === 'playground' && (
               <ModelPlaygroundView
                 initialModelRef={playgroundModelRef}
                 initialDatasetId={selectedDatasetId}
-                onSelectDataset={(id) => setSelectedDatasetId(id)}
+                onSelectDataset={(id) => selectActiveDataset(id || null)}
               />
             )}
             {section === 'evaluation' && (
               <EvaluationCenterView
                 initialDatasetId={selectedDatasetId}
-                onSelectDataset={(id) => setSelectedDatasetId(id)}
+                onSelectDataset={(id) => selectActiveDataset(id || null)}
                 onNavigate={handleNavigate}
               />
             )}
             {section === 'comparison' && (
               <ModelComparisonView
                 initialDatasetId={selectedDatasetId}
-                onSelectDataset={(id) => setSelectedDatasetId(id)}
+                onSelectDataset={(id) => selectActiveDataset(id || null)}
               />
             )}
             {section === 'registry' && (
               <ModelRegistryView
+                activeDataset={activeDataset}
                 onOpenPlayground={(ref) => {
                   setPlaygroundModelRef(ref);
                   handleNavigate('playground');
@@ -520,14 +618,16 @@ export default function App() {
             )}
             {section === 'history' && (
               <ExperimentHistoryView
+                activeDataset={activeDataset}
                 onOpenMonitor={(id) => handleNavigate('monitor', id)}
+                onNavigate={handleNavigate}
               />
             )}
             {section === 'settings' && (
               <SettingsView
                 theme={theme}
                 onToggleTheme={setTheme}
-                onWorkspaceUpdated={loadOverview}
+                onWorkspaceUpdated={loadWorkspaceData}
               />
             )}
           </Suspense>

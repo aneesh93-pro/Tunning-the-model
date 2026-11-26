@@ -1,0 +1,364 @@
+{
+  "format": "raw_text",
+  "cleanedRows": [
+    {
+      "customer_query": "Where is my package tracking number for order 4812?",
+      "channel": "email",
+      "support_category": "shipping"
+    },
+    {
+      "customer_query": "I was billed twice on my monthly Pro invoice.",
+      "channel": "chat",
+      "support_category": "billing"
+    },
+    {
+      "customer_query": "The API key returns 401 unauthorized after rotating tokens.",
+      "channel": "web",
+      "support_category": "technical_support"
+    },
+    {
+      "customer_query": "Can I expedite overnight delivery for item SKU-99?",
+      "channel": "phone",
+      "support_category": "shipping"
+    },
+    {
+      "customer_query": "Need a VAT receipt PDF for October payment.",
+      "channel": "email",
+      "support_category": "billing"
+    },
+    {
+      "customer_query": "App crashes when exporting JSONL dataset on Safari.",
+      "channel": "web",
+      "support_category": "technical_support"
+    },
+    {
+      "customer_query": "Track shipment delayed at Memphis hub.",
+      "channel": "chat",
+      "support_category": "shipping"
+    },
+    {
+      "customer_query": "Refund still pending after canceling annual plan.",
+      "channel": "email",
+      "support_category": "billing"
+    },
+    {
+      "customer_query": "Webhook signature verification fails on payload.",
+      "channel": "web",
+      "support_category": "technical_support"
+    },
+    {
+      "customer_query": "Change shipping address before carrier pickup.",
+      "channel": "phone",
+      "support_category": "shipping"
+    }
+  ],
+  "examples": [
+    {
+      "id": "ex_0",
+      "hash": "1w68d7rf6p5",
+      "format": "raw_text",
+      "promptText": "customer_query: Where is my package tracking number for order 4812? | channel: email",
+      "targetText": "support_category: shipping",
+      "raw": {
+        "customer_query": "Where is my package tracking number for order 4812?",
+        "channel": "email",
+        "support_category": "shipping"
+      }
+    },
+    {
+      "id": "ex_1",
+      "hash": "95i5blt4c7",
+      "format": "raw_text",
+      "promptText": "customer_query: I was billed twice on my monthly Pro invoice. | channel: chat",
+      "targetText": "support_category: billing",
+      "raw": {
+        "customer_query": "I was billed twice on my monthly Pro invoice.",
+        "channel": "chat",
+        "support_category": "billing"
+      }
+    },
+    {
+      "id": "ex_2",
+      "hash": "1qeh5fz0tgz",
+      "format": "raw_text",
+      "promptText": "customer_query: The API key returns 401 unauthorized after rotating tokens. | channel: web",
+      "targetText": "support_category: technical_support",
+      "raw": {
+        "customer_query": "The API key returns 401 unauthorized after rotating tokens.",
+        "channel": "web",
+        "support_category": "technical_support"
+      }
+    },
+    {
+      "id": "ex_3",
+      "hash": "1y1g06i18as",
+      "format": "raw_text",
+      "promptText": "customer_query: Can I expedite overnight delivery for item SKU-99? | channel: phone",
+      "targetText": "support_category: shipping",
+      "raw": {
+        "customer_query": "Can I expedite overnight delivery for item SKU-99?",
+        "channel": "phone",
+        "support_category": "shipping"
+      }
+    },
+    {
+      "id": "ex_4",
+      "hash": "1y8onexskoq",
+      "format": "raw_text",
+      "promptText": "customer_query: Need a VAT receipt PDF for October payment. | channel: email",
+      "targetText": "support_category: billing",
+      "raw": {
+        "customer_query": "Need a VAT receipt PDF for October payment.",
+        "channel": "email",
+        "support_category": "billing"
+      }
+    },
+    {
+      "id": "ex_5",
+      "hash": "248icmgrany",
+      "format": "raw_text",
+      "promptText": "customer_query: App crashes when exporting JSONL dataset on Safari. | channel: web",
+      "targetText": "support_category: technical_support",
+      "raw": {
+        "customer_query": "App crashes when exporting JSONL dataset on Safari.",
+        "channel": "web",
+        "support_category": "technical_support"
+      }
+    },
+    {
+      "id": "ex_6",
+      "hash": "8kzdclf4a6",
+      "format": "raw_text",
+      "promptText": "customer_query: Track shipment delayed at Memphis hub. | channel: chat",
+      "targetText": "support_category: shipping",
+      "raw": {
+        "customer_query": "Track shipment delayed at Memphis hub.",
+        "channel": "chat",
+        "support_category": "shipping"
+      }
+    },
+    {
+      "id": "ex_7",
+      "hash": "29cebd4mn96",
+      "format": "raw_text",
+      "promptText": "customer_query: Refund still pending after canceling annual plan. | channel: email",
+      "targetText": "support_category: billing",
+      "raw": {
+        "customer_query": "Refund still pending after canceling annual plan.",
+        "channel": "email",
+        "support_category": "billing"
+      }
+    },
+    {
+      "id": "ex_8",
+      "hash": "hxz24nopso",
+      "format": "raw_text",
+      "promptText": "customer_query: Webhook signature verification fails on payload. | channel: web",
+      "targetText": "support_category: technical_support",
+      "raw": {
+        "customer_query": "Webhook signature verification fails on payload.",
+        "channel": "web",
+        "support_category": "technical_support"
+      }
+    },
+    {
+      "id": "ex_9",
+      "hash": "5bmxxbsees",
+      "format": "raw_text",
+      "promptText": "customer_query: Change shipping address before carrier pickup. | channel: phone",
+      "targetText": "support_category: shipping",
+      "raw": {
+        "customer_query": "Change shipping address before carrier pickup.",
+        "channel": "phone",
+        "support_category": "shipping"
+      }
+    }
+  ],
+  "train": [
+    {
+      "id": "ex_9",
+      "hash": "5bmxxbsees",
+      "format": "raw_text",
+      "promptText": "customer_query: Change shipping address before carrier pickup. | channel: phone",
+      "targetText": "support_category: shipping",
+      "raw": {
+        "customer_query": "Change shipping address before carrier pickup.",
+        "channel": "phone",
+        "support_category": "shipping"
+      }
+    },
+    {
+      "id": "ex_0",
+      "hash": "1w68d7rf6p5",
+      "format": "raw_text",
+      "promptText": "customer_query: Where is my package tracking number for order 4812? | channel: email",
+      "targetText": "support_category: shipping",
+      "raw": {
+        "customer_query": "Where is my package tracking number for order 4812?",
+        "channel": "email",
+        "support_category": "shipping"
+      }
+    },
+    {
+      "id": "ex_8",
+      "hash": "hxz24nopso",
+      "format": "raw_text",
+      "promptText": "customer_query: Webhook signature verification fails on payload. | channel: web",
+      "targetText": "support_category: technical_support",
+      "raw": {
+        "customer_query": "Webhook signature verification fails on payload.",
+        "channel": "web",
+        "support_category": "technical_support"
+      }
+    },
+    {
+      "id": "ex_4",
+      "hash": "1y8onexskoq",
+      "format": "raw_text",
+      "promptText": "customer_query: Need a VAT receipt PDF for October payment. | channel: email",
+      "targetText": "support_category: billing",
+      "raw": {
+        "customer_query": "Need a VAT receipt PDF for October payment.",
+        "channel": "email",
+        "support_category": "billing"
+      }
+    }
+  ],
+  "validation": [
+    {
+      "id": "ex_2",
+      "hash": "1qeh5fz0tgz",
+      "format": "raw_text",
+      "promptText": "customer_query: The API key returns 401 unauthorized after rotating tokens. | channel: web",
+      "targetText": "support_category: technical_support",
+      "raw": {
+        "customer_query": "The API key returns 401 unauthorized after rotating tokens.",
+        "channel": "web",
+        "support_category": "technical_support"
+      }
+    },
+    {
+      "id": "ex_1",
+      "hash": "95i5blt4c7",
+      "format": "raw_text",
+      "promptText": "customer_query: I was billed twice on my monthly Pro invoice. | channel: chat",
+      "targetText": "support_category: billing",
+      "raw": {
+        "customer_query": "I was billed twice on my monthly Pro invoice.",
+        "channel": "chat",
+        "support_category": "billing"
+      }
+    },
+    {
+      "id": "ex_3",
+      "hash": "1y1g06i18as",
+      "format": "raw_text",
+      "promptText": "customer_query: Can I expedite overnight delivery for item SKU-99? | channel: phone",
+      "targetText": "support_category: shipping",
+      "raw": {
+        "customer_query": "Can I expedite overnight delivery for item SKU-99?",
+        "channel": "phone",
+        "support_category": "shipping"
+      }
+    }
+  ],
+  "test": [
+    {
+      "id": "ex_7",
+      "hash": "29cebd4mn96",
+      "format": "raw_text",
+      "promptText": "customer_query: Refund still pending after canceling annual plan. | channel: email",
+      "targetText": "support_category: billing",
+      "raw": {
+        "customer_query": "Refund still pending after canceling annual plan.",
+        "channel": "email",
+        "support_category": "billing"
+      }
+    },
+    {
+      "id": "ex_6",
+      "hash": "8kzdclf4a6",
+      "format": "raw_text",
+      "promptText": "customer_query: Track shipment delayed at Memphis hub. | channel: chat",
+      "targetText": "support_category: shipping",
+      "raw": {
+        "customer_query": "Track shipment delayed at Memphis hub.",
+        "channel": "chat",
+        "support_category": "shipping"
+      }
+    },
+    {
+      "id": "ex_5",
+      "hash": "248icmgrany",
+      "format": "raw_text",
+      "promptText": "customer_query: App crashes when exporting JSONL dataset on Safari. | channel: web",
+      "targetText": "support_category: technical_support",
+      "raw": {
+        "customer_query": "App crashes when exporting JSONL dataset on Safari.",
+        "channel": "web",
+        "support_category": "technical_support"
+      }
+    }
+  ],
+  "splits": {
+    "trainCount": 4,
+    "valCount": 3,
+    "testCount": 3,
+    "trainRatio": 0.7,
+    "valRatio": 0.15,
+    "testRatio": 0.15,
+    "leakageFree": true
+  },
+  "report": {
+    "valid": true,
+    "format": "raw_text",
+    "rowCount": 10,
+    "columnCount": 3,
+    "missingValuesTotal": 0,
+    "duplicateCount": 0,
+    "leakageDetected": false,
+    "overlapCount": 0,
+    "avgTokenEstimate": 32,
+    "maxTokenEstimate": 36,
+    "warnings": [],
+    "errors": [],
+    "columns": [
+      {
+        "name": "customer_query",
+        "inferredType": "string",
+        "missingCount": 0,
+        "uniqueCount": 10,
+        "avgLength": 48,
+        "sampleValues": [
+          "Where is my package tracking number for order 4812?",
+          "I was billed twice on my monthly Pro invoice.",
+          "The API key returns 401 unauthorized after rotating tokens."
+        ]
+      },
+      {
+        "name": "channel",
+        "inferredType": "string",
+        "missingCount": 0,
+        "uniqueCount": 4,
+        "avgLength": 4,
+        "sampleValues": [
+          "email",
+          "chat",
+          "web"
+        ]
+      },
+      {
+        "name": "support_category",
+        "inferredType": "string",
+        "missingCount": 0,
+        "uniqueCount": 3,
+        "avgLength": 10,
+        "sampleValues": [
+          "shipping",
+          "billing",
+          "technical_support"
+        ]
+      }
+    ]
+  }
+}

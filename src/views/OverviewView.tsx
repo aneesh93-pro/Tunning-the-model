@@ -57,13 +57,14 @@ import { ShinyText } from '../components/reactbits/ShinyText';
 import { SpotlightCard } from '../components/reactbits/SpotlightCard';
 import { TextLoop } from '../components/reactbits/TextLoop';
 import { TextPressure } from '../components/reactbits/TextPressure';
-import { LiquidButton } from '@/components/ui/liquid-glass-button';
+import { LiquidButton, MetalButton } from '@/components/ui/liquid-glass-button';
 import type { OverviewResponse } from '../lib/api';
 import {
   renderMiniMindBriefBackDataUrl,
   renderMiniMindBriefFrontDataUrl,
 } from '../lib/minimindPaperAsset';
 import { useIsDark } from '../lib/useDarkMode';
+import type { DatasetRecord } from '../shared/types';
 import { formatDuration, formatNumber } from '../lib/utils';
 
 export type NavSection =
@@ -82,16 +83,30 @@ export type NavSection =
 interface OverviewViewProps {
   data: OverviewResponse | null;
   loading: boolean;
+  activeDataset?: DatasetRecord | null;
+  datasets?: DatasetRecord[];
+  onSelectDataset?: (datasetId: string) => void;
+  onImportDataset?: (file: File) => void;
   onNavigate: (section: NavSection, experimentId?: string) => void;
   onOpenPlayground?: (modelRef: string) => void;
 }
 
-export function OverviewView({ data, loading, onNavigate, onOpenPlayground }: OverviewViewProps) {
+export function OverviewView({
+  data,
+  loading,
+  activeDataset,
+  datasets = [],
+  onSelectDataset,
+  onImportDataset,
+  onNavigate,
+  onOpenPlayground,
+}: OverviewViewProps) {
   const isDark = useIsDark();
   const [releaseBehavior, setReleaseBehavior] =
     useState<PaperCrumpleReleaseBehavior>('creased');
   const [paperState, setPaperState] = useState<PaperCrumpleState>('flat');
   const [paperResetKey, setPaperResetKey] = useState(0);
+  const overviewImportInputRef = useRef<HTMLInputElement>(null);
 
   const modelViewerRef = useRef<ModelViewerHandle>(null);
   const [iconEnvironment, setIconEnvironment] =
@@ -706,15 +721,15 @@ export function OverviewView({ data, loading, onNavigate, onOpenPlayground }: Ov
                   {iconAutoRotate ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
                   {iconAutoRotate ? 'Pause Spin' : 'Auto Spin'}
                 </LiquidButton>
-                <LiquidButton
+                <MetalButton
                   type="button"
-                  variant="default"
+                  variant="primary"
                   onClick={handleCaptureIcon}
                   disabled={!iconLoaded}
                 >
                   <Download className="w-3.5 h-3.5" />
                   Export Icon PNG
-                </LiquidButton>
+                </MetalButton>
               </div>
             </div>
           </div>
@@ -825,6 +840,112 @@ export function OverviewView({ data, loading, onNavigate, onOpenPlayground }: Ov
             <div className="pointer-events-none absolute bottom-2.5 right-3 rounded-md bg-black/55 px-2.5 py-1 text-[10px] font-mono text-slate-200 backdrop-blur-sm">
               Hold &amp; drag sheet · 3D Paper Physics
             </div>
+          </div>
+        </div>
+      </SpotlightCard>
+
+      {/* Active Workspace Dataset Sync Strip */}
+      <SpotlightCard
+        spotlightColor={isDark ? 'rgba(37, 99, 235, 0.16)' : 'rgba(37, 99, 235, 0.08)'}
+        className="p-4 sm:p-5"
+      >
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="p-2.5 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 shrink-0">
+              <Database className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-mono uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                  Active Workspace Dataset
+                </span>
+                {activeDataset && (
+                  <span className="rounded px-1.5 py-0.5 text-[10px] font-mono uppercase bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                    {activeDataset.status.replace('_', ' ')}
+                  </span>
+                )}
+              </div>
+              <div className="mt-0.5 text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">
+                {activeDataset ? activeDataset.name : 'No dataset imported yet'}
+              </div>
+              <p className="mt-0.5 text-xs font-mono text-slate-500 dark:text-slate-400">
+                {activeDataset
+                  ? `${activeDataset.format.toUpperCase()} · ${activeDataset.rowCount} rows · ${activeDataset.columnCount} attributes${
+                      activeDataset.splits
+                        ? ` · train ${activeDataset.splits.trainCount} / val ${activeDataset.splits.valCount} / test ${activeDataset.splits.testCount}`
+                        : ''
+                    }`
+                  : 'Import a CSV, JSON, JSONL, or TXT dataset to populate Studio, Playground, and Evaluation'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {datasets.length > 0 && onSelectDataset && (
+              <select
+                aria-label="Overview active dataset"
+                value={activeDataset?.id ?? ''}
+                onChange={(e) => onSelectDataset(e.target.value)}
+                className="px-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-white/[0.1] bg-slate-50 dark:bg-[#090B10] max-w-[220px]"
+              >
+                {datasets.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name} ({d.rowCount} rows)
+                  </option>
+                ))}
+              </select>
+            )}
+            {onImportDataset && (
+              <>
+                <input
+                  ref={overviewImportInputRef}
+                  type="file"
+                  accept=".csv,.tsv,.json,.jsonl,.ndjson,.txt"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) onImportDataset(file);
+                    e.target.value = '';
+                  }}
+                />
+                <LiquidButton
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => overviewImportInputRef.current?.click()}
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  Import Dataset
+                </LiquidButton>
+              </>
+            )}
+            <LiquidButton
+              type="button"
+              size="sm"
+              variant="default"
+              onClick={() => onNavigate('studio')}
+            >
+              <FlaskConical className="w-3.5 h-3.5" />
+              Fine-Tune in Studio
+            </LiquidButton>
+            <LiquidButton
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => onNavigate('playground')}
+            >
+              <SquareTerminal className="w-3.5 h-3.5" />
+              Playground
+            </LiquidButton>
+            <LiquidButton
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => onNavigate('evaluation')}
+            >
+              <Activity className="w-3.5 h-3.5" />
+              Evaluate
+            </LiquidButton>
           </div>
         </div>
       </SpotlightCard>

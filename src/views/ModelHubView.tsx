@@ -5,6 +5,7 @@ import {
   BrainCircuit,
   CheckCircle2,
   Cpu,
+  Database,
   Globe,
   Layers,
   MessageSquare,
@@ -19,11 +20,17 @@ import GlassIcons, { type GlassIconsItem } from '../components/reactbits/GlassIc
 import { SpotlightCard } from '../components/reactbits/SpotlightCard';
 import { api } from '../lib/api';
 import { useIsDark } from '../lib/useDarkMode';
-import type { AiToolCategory, HardwareTelemetry, ModelSpec } from '../shared/types';
+import type {
+  AiToolCategory,
+  DatasetRecord,
+  HardwareTelemetry,
+  ModelSpec,
+} from '../shared/types';
 import type { NavSection } from './OverviewView';
 
 interface ModelHubViewProps {
   selectedModelId: string;
+  activeDataset?: DatasetRecord | null;
   onSelectModel: (modelId: string) => void;
   onTestInPlayground?: (modelId: string) => void;
   onNavigate: (section: NavSection) => void;
@@ -55,6 +62,7 @@ const TOOL_FILTERS: Array<{
 
 export function ModelHubView({
   selectedModelId,
+  activeDataset,
   onSelectModel,
   onTestInPlayground,
   onNavigate,
@@ -164,6 +172,31 @@ export function ModelHubView({
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-red-600 dark:text-red-400 flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           <span>{error}</span>
+        </div>
+      )}
+
+      {activeDataset && (
+        <div className="rounded-xl border border-blue-500/25 bg-blue-500/[0.06] px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 text-xs">
+          <div className="flex items-center gap-2 min-w-0">
+            <Database className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+            <span className="text-slate-700 dark:text-slate-200 truncate">
+              Active Dataset:{' '}
+              <strong className="font-semibold text-slate-900 dark:text-slate-100">
+                {activeDataset.name}
+              </strong>{' '}
+              <span className="font-mono text-slate-500 dark:text-slate-400">
+                ({activeDataset.rowCount} rows · {activeDataset.columnCount} attrs)
+              </span>{' '}
+              — automatically paired when launching Studio or Playground.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => onNavigate('datasets')}
+            className="text-blue-600 dark:text-blue-400 font-medium hover:underline shrink-0 self-start sm:self-auto"
+          >
+            Switch Dataset
+          </button>
         </div>
       )}
 

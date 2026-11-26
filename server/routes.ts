@@ -485,6 +485,11 @@ export function createApiRouter() {
       );
 
       logAudit('UPLOAD_DATASET', 'dataset', id, `Uploaded ${fileName} (${rows.length} rows, ${report.columnCount} attributes)`);
+      try {
+        ensureDatasetBundlePrepared(id);
+      } catch {
+        // Keep uploaded/validated record if dataset requires manual column mapping or cleaning options first
+      }
       const inserted = db.prepare('SELECT * FROM datasets WHERE id = ?').get(id) as Record<string, unknown>;
       res.status(201).json(mapDatasetRow(inserted));
     } catch (err) {

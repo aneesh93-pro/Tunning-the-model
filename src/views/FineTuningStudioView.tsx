@@ -1,11 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Cpu, Layers, Play, ShieldAlert } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { AlertTriangle, Cpu, Layers, Play, ShieldAlert, Upload } from 'lucide-react';
 import { RubberSegment } from '../components/reactbits/RubberSegment';
 import { AiOrb } from '@/components/ui/ai-orb';
-import { LiquidButton } from '@/components/ui/liquid-glass-button';
+import { LiquidButton, MetalButton } from '@/components/ui/liquid-glass-button';
 import { api } from '../lib/api';
 import { useIsDark } from '../lib/useDarkMode';
-import { pickPreferredDatasetId } from '../utils/datasetSelection';
+import {
+  buildExperimentDefaultsFromDataset,
+  pickPreferredDatasetId,
+} from '../utils/datasetSelection';
 import { estimateTrainingMemory, getModelById, PRETRAINED_MODELS } from '../ml/modelCatalog';
 import { formatDuration, formatNumber } from '../lib/utils';
 import type {
@@ -19,6 +22,7 @@ import type { NavSection } from './OverviewView';
 interface FineTuningStudioViewProps {
   initialDatasetId: string | null;
   onSelectDataset?: (datasetId: string) => void;
+  onDatasetImported?: (dataset: DatasetRecord) => void;
   initialModelId: string;
   onTrainingStarted: (experimentId: string) => void;
   onNavigate: (section: NavSection) => void;
@@ -27,6 +31,7 @@ interface FineTuningStudioViewProps {
 export function FineTuningStudioView({
   initialDatasetId,
   onSelectDataset,
+  onDatasetImported,
   initialModelId,
   onTrainingStarted,
 }: FineTuningStudioViewProps) {
@@ -35,12 +40,16 @@ export function FineTuningStudioView({
   const [hardware, setHardware] = useState<HardwareTelemetry | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [importingFile, setImportingFile] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [experimentName, setExperimentName] = useState('Banking Intent LoRA v1');
+  const [experimentName, setExperimentName] = useState('Custom Dataset LoRA v1');
   const [description, setDescription] = useState(
     'Supervised fine-tuning with low-rank adaptation on held-out split.'
   );
+  const userEditedNameRef = useRef(false);
+  const userEditedDescRef = useRef(false);
+  const studioFileInputRef = useRef<HTMLInputElement | null>(null);
   const [datasetId, setDatasetId] = useState(initialDatasetId || '');
   const [modelId, setModelId] = useState(initialModelId || PRETRAINED_MODELS[1].id);
   const [method, setMethod] = useState<TrainingMethod>('lora');
@@ -93,7 +102,14 @@ export function FineTuningStudioView({
   }, []);
 
   useEffect(() => {
-    if (initialDatasetId) setDatasetId(initialDatasetId);
+    if (!initialDatasetId) return;
+    setDatasetId(initialDatasetId);
+    if (!datasets.some((d) => d.id === initialDatasetId)) {
+      api
+        .getDatasets()
+        .then((ds) => setDatasets(ds))
+        .catch(() => undefined);
+    }
   }, [initialDatasetId]);
 
   useEffect(() => {
@@ -131,6 +147,34 @@ export function FineTuningStudioView({
   );
 
   const selectedDataset = datasets.find((d) => d.id === datasetId);
+
+  useEffect(() => {
+    if (!selectedDataset) return;
+    const defaults = buildExperimentDefaultsFromDataset(selectedDataset, method);
+    if (!userEditedNameRef.current) {
+      setExperimentName(defaults.experimentName);
+    }
+    if (!userEditedDescRef.current) {
+      setDescription(defaults.description);
+    }
+  }, [selectedDataset?.id, method]);
+
+  const handleStudioFileImport = async (file: File) => {
+    setImportingFile(true);
+    setError(null);
+    try {
+      const created = await api.uploadDatasetFile(file);
+      const updatedList = await api.getDatasets();
+      setDatasets(updatedList);
+      setDatasetId(created.id);
+      onSelectDataset?.(created.id);
+      onDatasetImported?.(created);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setImportingFile(false);
+    }
+  };
 
   const scheduleEstimate = useMemo(() => {
     const trainRows = selectedDataset?.splits?.trainCount ?? selectedDataset?.rowCount ?? 12;
@@ -280,14 +324,40 @@ export function FineTuningStudioView({
                 <input
                   type="text"
                   value={experimentName}
-                  onChange={(e) => setExperimentName(e.target.value)}
+                  onChange={(e) => {
+                    userEditedNameRef.current = true;
+                    setExperimentName(e.target.value);
+                  }}
                   className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-white/[0.1] bg-slate-50 dark:bg-[#090B10]"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
-                  Training Dataset
-                </label>
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-300">
+                    Training Dataset
+                  </label>
+                  <button
+                    type="button"
+                    disabled={importingFile}
+                    onClick={() => studioFileInputRef.current?.click()}
+                    className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
+                  >
+                    <Upload className="w-3 h-3" />
+                    {importingFile ? 'Importing...' : 'Import Dataset'}
+                  </button>
+                  <input
+                    ref={studioFileInputRef}
+                    type="file"
+                    accept=".csv,.tsv,.json,.jsonl,.ndjson,.txt,text/csv,text/tab-separated-values,application/json,text/plain"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) void handleStudioFileImport(f);
+                      e.target.value = '';
+                    }}
+                    className="sr-only"
+                    aria-label="Import training dataset file"
+                  />
+                </div>
                 <select
                   aria-label="Training Dataset"
                   value={datasetId}
@@ -380,7 +450,10 @@ export function FineTuningStudioView({
               <input
                 type="text"
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                onChange={(e) => {
+                  userEditedDescRef.current = true;
+                  setDescription(e.target.value);
+                }}
                 className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-white/[0.1] bg-slate-50 dark:bg-[#090B10]"
               />
             </div>
@@ -840,14 +913,14 @@ export function FineTuningStudioView({
               >
                 Cancel
               </LiquidButton>
-              <LiquidButton
+              <MetalButton
                 type="button"
-                variant="default"
+                variant="primary"
                 disabled={submitting}
                 onClick={handleLaunch}
               >
                 {submitting ? 'Launching...' : 'Confirm & Start Training'}
-              </LiquidButton>
+              </MetalButton>
             </div>
           </div>
         </div>

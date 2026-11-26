@@ -3,16 +3,18 @@ import {
   AlertTriangle,
   Check,
   Copy,
+  Database,
   Download,
   ExternalLink,
   FileText,
+  FlaskConical,
   FolderOpen,
   Layers,
   Rocket,
   Trash2,
 } from 'lucide-react';
 import Folder from '../components/reactbits/Folder';
-import { LiquidButton } from '@/components/ui/liquid-glass-button';
+import { LiquidButton, MetalButton } from '@/components/ui/liquid-glass-button';
 import { api } from '../lib/api';
 import { useIsDark } from '../lib/useDarkMode';
 import { formatBytes, formatNumber } from '../lib/utils';
@@ -20,15 +22,17 @@ import {
   buildAdapterBundleDocs,
   type AdapterBundleDocId,
 } from '../utils/folderBundles';
-import type { RegisteredModelRecord } from '../shared/types';
+import type { DatasetRecord, RegisteredModelRecord } from '../shared/types';
 import type { NavSection } from './OverviewView';
 
 interface ModelRegistryViewProps {
+  activeDataset?: DatasetRecord | null;
   onOpenPlayground: (modelRef: string) => void;
   onNavigate: (section: NavSection) => void;
 }
 
 export function ModelRegistryView({
+  activeDataset,
   onOpenPlayground,
   onNavigate,
 }: ModelRegistryViewProps) {
@@ -156,6 +160,32 @@ ${JSON.stringify(m.trainingConfig, null, 2)}
           <span>{error}</span>
         </div>
       )}
+
+      {activeDataset && (() => {
+        const matchingCount = models.filter((m) => m.datasetId === activeDataset.id).length;
+        return (
+          <div className="rounded-xl border border-blue-500/25 bg-blue-500/[0.06] px-4 py-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs">
+            <div className="flex items-center gap-2 min-w-0">
+              <Database className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+              <span className="text-slate-700 dark:text-slate-200 truncate">
+                Active Dataset:{' '}
+                <strong className="font-semibold text-slate-900 dark:text-slate-100">
+                  {activeDataset.name}
+                </strong>{' '}
+                — {matchingCount} registered {matchingCount === 1 ? 'adapter' : 'adapters'} trained on this dataset.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => onNavigate('studio')}
+              className="inline-flex items-center gap-1.5 text-blue-600 dark:text-blue-400 font-medium hover:underline shrink-0 self-start sm:self-auto"
+            >
+              <FlaskConical className="w-3.5 h-3.5" />
+              Train Adapter on {activeDataset.name}
+            </button>
+          </div>
+        );
+      })()}
 
       {loading ? (
         <div className="p-8 text-xs text-slate-500">Loading registered models...</div>
@@ -351,13 +381,18 @@ ${JSON.stringify(m.trainingConfig, null, 2)}
                         <ExternalLink className="w-3.5 h-3.5" />
                         Launch Playground
                       </LiquidButton>
-                      <a
-                        href={`/api/models/${inspectedModel.id}/download`}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-white/[0.1] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.04]"
+                      <MetalButton
+                        type="button"
+                        variant="gold"
+                        onClick={() => {
+                          const link = document.createElement('a');
+                          link.href = `/api/models/${inspectedModel.id}/download`;
+                          link.click();
+                        }}
                       >
                         <Download className="w-3.5 h-3.5" />
                         Download .zip ({formatBytes(inspectedModel.adapterSizeBytes)})
-                      </a>
+                      </MetalButton>
                     </div>
                   </div>
                 </div>
@@ -410,7 +445,16 @@ ${JSON.stringify(m.trainingConfig, null, 2)}
                       </td>
                       <td className="py-3 px-4 text-slate-600 dark:text-slate-300">{m.baseModelName}</td>
                       <td className="py-3 px-4 font-mono uppercase">{m.method}</td>
-                      <td className="py-3 px-4 text-slate-600 dark:text-slate-300">{m.datasetName}</td>
+                      <td className="py-3 px-4 text-slate-600 dark:text-slate-300">
+                        <div className="flex items-center gap-1.5">
+                          <span>{m.datasetName}</span>
+                          {activeDataset && m.datasetId === activeDataset.id && (
+                            <span className="rounded px-1.5 py-0.5 text-[10px] font-mono bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                              active
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="py-3 px-4 text-right font-mono tabular-nums whitespace-nowrap">
                         {formatBytes(m.adapterSizeBytes)}
                       </td>

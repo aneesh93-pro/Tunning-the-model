@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
+  Database,
   Download,
+  FlaskConical,
   Pause,
   Play,
   Square,
@@ -20,24 +22,30 @@ import {
   YAxis,
 } from 'recharts';
 import { AiOrb } from '@/components/ui/ai-orb';
-import { LiquidButton } from '@/components/ui/liquid-glass-button';
+import { LiquidButton, MetalButton } from '@/components/ui/liquid-glass-button';
 import { mapExperimentStatusToOrbState } from '@/utils/aiOrbState';
 import { api } from '../lib/api';
 import { formatBytes, formatDuration } from '../lib/utils';
 import type {
+  DatasetRecord,
   ExperimentRecord,
   HardwareTelemetry,
   TrainingMetricPoint,
 } from '../shared/types';
+import type { NavSection } from './OverviewView';
 
 interface TrainingMonitorViewProps {
   activeExperimentId: string | null;
+  activeDataset?: DatasetRecord | null;
   onSelectExperiment: (id: string) => void;
+  onNavigate?: (section: NavSection) => void;
 }
 
 export function TrainingMonitorView({
   activeExperimentId,
+  activeDataset,
   onSelectExperiment,
+  onNavigate,
 }: TrainingMonitorViewProps) {
   const [experiments, setExperiments] = useState<ExperimentRecord[]>([]);
   const [selectedExp, setSelectedExp] = useState<ExperimentRecord | null>(null);
@@ -231,6 +239,42 @@ export function TrainingMonitorView({
         </div>
       )}
 
+      {activeDataset && (
+        <div className="rounded-xl border border-blue-500/25 bg-blue-500/[0.06] px-4 py-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2 min-w-0">
+            <Database className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+            <span className="text-slate-700 dark:text-slate-200 truncate">
+              {selectedExp && selectedExp.datasetId === activeDataset.id ? (
+                <>
+                  Monitoring active workspace dataset:{' '}
+                  <strong className="font-semibold text-slate-900 dark:text-slate-100">
+                    {activeDataset.name}
+                  </strong>
+                </>
+              ) : (
+                <>
+                  Active workspace dataset:{' '}
+                  <strong className="font-semibold text-slate-900 dark:text-slate-100">
+                    {activeDataset.name}
+                  </strong>
+                  {selectedExp ? ` (currently viewing run on ${selectedExp.datasetName})` : ''}
+                </>
+              )}
+            </span>
+          </div>
+          {onNavigate && (!selectedExp || selectedExp.datasetId !== activeDataset.id) && (
+            <button
+              type="button"
+              onClick={() => onNavigate('studio')}
+              className="inline-flex items-center gap-1.5 text-blue-600 dark:text-blue-400 font-medium hover:underline shrink-0 self-start sm:self-auto"
+            >
+              <FlaskConical className="w-3.5 h-3.5" />
+              Train on {activeDataset.name}
+            </button>
+          )}
+        </div>
+      )}
+
       {loading && !selectedExp ? (
         <div className="space-y-4 animate-pulse">
           <div className="h-28 rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C]" />
@@ -240,14 +284,26 @@ export function TrainingMonitorView({
           </div>
         </div>
       ) : !selectedExp ? (
-        <div className="rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] p-12 text-center">
-          <Terminal className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-          <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
-            No training runs to monitor
-          </p>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Launch an experiment from Fine-Tuning Studio to stream real-time step metrics.
-          </p>
+        <div className="rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] p-12 text-center space-y-3">
+          <Terminal className="w-8 h-8 text-slate-400 mx-auto" />
+          <div>
+            <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
+              No training runs to monitor
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              {activeDataset
+                ? `Launch an experiment on "${activeDataset.name}" from Fine-Tuning Studio to stream real-time step metrics.`
+                : 'Launch an experiment from Fine-Tuning Studio to stream real-time step metrics.'}
+            </p>
+          </div>
+          {onNavigate && (
+            <div className="pt-1">
+              <LiquidButton type="button" size="sm" variant="default" onClick={() => onNavigate('studio')}>
+                <FlaskConical className="w-3.5 h-3.5" />
+                Open Fine-Tuning Studio
+              </LiquidButton>
+            </div>
+          )}
         </div>
       ) : (
         <>
@@ -303,10 +359,9 @@ export function TrainingMonitorView({
                   </LiquidButton>
                 )}
                 {selectedExp.status === 'paused' && (
-                  <LiquidButton
+                  <MetalButton
                     type="button"
-                    size="sm"
-                    variant="default"
+                    variant="success"
                     onClick={() =>
                       api
                         .resumeTraining(selectedExp.id)
@@ -316,24 +371,24 @@ export function TrainingMonitorView({
                   >
                     <Play className="w-3.5 h-3.5" />
                     Resume
-                  </LiquidButton>
+                  </MetalButton>
                 )}
                 {(selectedExp.status === 'running' ||
                   selectedExp.status === 'paused' ||
                   selectedExp.status === 'preparing') && (
-                  <button
+                  <MetalButton
                     type="button"
+                    variant="error"
                     onClick={() =>
                       api
                         .cancelTraining(selectedExp.id)
                         .then(() => loadListAndDetail(selectedExp.id))
                         .catch((err) => setError((err as Error).message))
                     }
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-500/10"
                   >
                     <Square className="w-3.5 h-3.5" />
                     Stop
-                  </button>
+                  </MetalButton>
                 )}
               </div>
             </div>

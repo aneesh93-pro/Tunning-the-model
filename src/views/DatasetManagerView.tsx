@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import GlassIcons, { type GlassIconsItem } from '../components/reactbits/GlassIcons';
 import Folder from '../components/reactbits/Folder';
-import { LiquidButton } from '@/components/ui/liquid-glass-button';
+import { LiquidButton, MetalButton } from '@/components/ui/liquid-glass-button';
 import { api } from '../lib/api';
 import { useIsDark } from '../lib/useDarkMode';
 import { formatBytes } from '../lib/utils';
@@ -29,6 +29,7 @@ import type { NavSection } from './OverviewView';
 interface DatasetManagerViewProps {
   selectedDatasetId?: string | null;
   onSelectForTraining: (datasetId: string) => void;
+  onDatasetsChanged?: (preferredId?: string) => void;
   onNavigate: (section: NavSection) => void;
 }
 
@@ -45,6 +46,7 @@ const PIPELINE_STAGES = [
 export function DatasetManagerView({
   selectedDatasetId: externalSelectedDatasetId,
   onSelectForTraining,
+  onDatasetsChanged,
   onNavigate,
 }: DatasetManagerViewProps) {
   const isDark = useIsDark();
@@ -123,14 +125,17 @@ export function DatasetManagerView({
         setMapOutput(detail.dataset.columnMapping?.output || '');
       } else {
         setSelectedId(null);
+        onSelectForTraining('');
         setPreviewRows([]);
         setProcessedPreview(null);
         setMapInstruction('');
         setMapInput('');
         setMapOutput('');
       }
+      return target;
     } catch (err) {
       setError((err as Error).message);
+      return null;
     } finally {
       setLoading(false);
     }
@@ -139,6 +144,16 @@ export function DatasetManagerView({
   useEffect(() => {
     void loadDatasets();
   }, []);
+
+  useEffect(() => {
+    if (
+      externalSelectedDatasetId &&
+      externalSelectedDatasetId !== selectedId &&
+      datasets.some((d) => d.id === externalSelectedDatasetId)
+    ) {
+      void handleSelectDataset(externalSelectedDatasetId);
+    }
+  }, [externalSelectedDatasetId, datasets]);
 
   const handleSelectDataset = async (id: string) => {
     setSelectedId(id);
@@ -169,6 +184,7 @@ export function DatasetManagerView({
         `Uploaded "${created.fileName}" (${created.rowCount} rows, ${created.columnCount} attributes) and set as active workspace dataset for Fine-Tuning Studio, Evaluation, Comparison, and Playground.`
       );
       await loadDatasets(created.id);
+      onDatasetsChanged?.(created.id);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -210,6 +226,7 @@ export function DatasetManagerView({
         `Created dataset "${created.name}" (${created.rowCount} rows, ${created.columnCount} attributes) and set as active workspace dataset.`
       );
       await loadDatasets(created.id);
+      onDatasetsChanged?.(created.id);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -267,6 +284,7 @@ export function DatasetManagerView({
       );
       setPreviewTab('cleaned');
       await loadDatasets(selected.id);
+      onDatasetsChanged?.(selected.id);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -279,7 +297,8 @@ export function DatasetManagerView({
     try {
       await api.deleteDataset(id);
       setNotice('Dataset deleted.');
-      await loadDatasets();
+      const nextTarget = await loadDatasets();
+      onDatasetsChanged?.(nextTarget ?? undefined);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -724,14 +743,14 @@ export function DatasetManagerView({
                     >
                       Validate Schema
                     </LiquidButton>
-                    <LiquidButton
+                    <MetalButton
                       type="button"
-                      variant="default"
+                      variant="success"
                       disabled={busy}
                       onClick={handlePreprocess}
                     >
                       {busy ? 'Processing...' : 'Preprocess & Split'}
-                    </LiquidButton>
+                    </MetalButton>
                   </div>
                 </div>
               </div>

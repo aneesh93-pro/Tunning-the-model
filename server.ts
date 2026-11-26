@@ -21,11 +21,32 @@ async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
     const publicDir = path.resolve(process.cwd(), 'public');
     app.use(express.static(publicDir, { setHeaders: setStaticHeaders }));
+    const disableHmr = process.env.DISABLE_HMR === 'true';
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
-        hmr: process.env.DISABLE_HMR === 'true' ? false : { server: httpServer },
+        hmr: !disableHmr,
+        ws: disableHmr ? false : { server: httpServer },
       },
+      plugins: disableHmr
+        ? [
+            {
+              name: 'disable-hmr-client-ws',
+              enforce: 'post',
+              transform(code, id) {
+                const normalizedId = id.replace(/\\/g, '/');
+                if (normalizedId.endsWith('/vite/dist/client/client.mjs')) {
+                  return code
+                    .replace('console.debug("[vite] connecting...");', '')
+                    .replace(
+                      'transport.connect(createHMRHandler(handleMessage));',
+                      '// HMR WebSocket disabled via DISABLE_HMR'
+                    );
+                }
+              },
+            },
+          ]
+        : [],
       appType: 'spa',
     });
     app.use(vite.middlewares);

@@ -102,8 +102,18 @@ export function ModelComparisonView({
   }, []);
 
   useEffect(() => {
-    if (initialDatasetId && datasets.some((d) => d.id === initialDatasetId)) {
+    if (!initialDatasetId) return;
+    if (datasets.some((d) => d.id === initialDatasetId)) {
       setDatasetId(initialDatasetId);
+    } else {
+      api
+        .getDatasets()
+        .then((dsList) => {
+          setDatasets(dsList);
+          const resolved = pickPreferredDatasetId(dsList, initialDatasetId);
+          if (resolved) setDatasetId(resolved);
+        })
+        .catch(() => undefined);
     }
   }, [initialDatasetId, datasets]);
 

@@ -1,17 +1,26 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, History, Search } from 'lucide-react';
+import { AlertTriangle, Database, FlaskConical, History, Search } from 'lucide-react';
+import { LiquidButton } from '@/components/ui/liquid-glass-button';
 import { api } from '../lib/api';
 import { formatDuration, formatNumber } from '../lib/utils';
-import type { ExperimentRecord } from '../shared/types';
+import type { DatasetRecord, ExperimentRecord } from '../shared/types';
+import type { NavSection } from './OverviewView';
 
 interface ExperimentHistoryViewProps {
+  activeDataset?: DatasetRecord | null;
   onOpenMonitor: (experimentId: string) => void;
+  onNavigate?: (section: NavSection) => void;
 }
 
-export function ExperimentHistoryView({ onOpenMonitor }: ExperimentHistoryViewProps) {
+export function ExperimentHistoryView({
+  activeDataset,
+  onOpenMonitor,
+  onNavigate,
+}: ExperimentHistoryViewProps) {
   const [experiments, setExperiments] = useState<ExperimentRecord[]>([]);
   const [query, setQuery] = useState('');
   const [methodFilter, setMethodFilter] = useState<string>('all');
+  const [onlyActiveDataset, setOnlyActiveDataset] = useState(false);
   const [selected, setSelected] = useState<ExperimentRecord | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,7 +41,9 @@ export function ExperimentHistoryView({ onOpenMonitor }: ExperimentHistoryViewPr
       exp.modelName.toLowerCase().includes(query.toLowerCase()) ||
       exp.datasetName.toLowerCase().includes(query.toLowerCase());
     const matchesMethod = methodFilter === 'all' || exp.method === methodFilter;
-    return matchesQuery && matchesMethod;
+    const matchesDataset =
+      !onlyActiveDataset || !activeDataset || exp.datasetId === activeDataset.id;
+    return matchesQuery && matchesMethod && matchesDataset;
   });
 
   return (
@@ -47,7 +58,21 @@ export function ExperimentHistoryView({ onOpenMonitor }: ExperimentHistoryViewPr
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
+          {activeDataset && (
+            <button
+              type="button"
+              onClick={() => setOnlyActiveDataset((prev) => !prev)}
+              className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs rounded-lg border transition-colors ${
+                onlyActiveDataset
+                  ? 'border-blue-500 bg-blue-500/15 text-blue-600 dark:text-blue-400 font-medium'
+                  : 'border-slate-200 dark:border-white/[0.1] bg-white dark:bg-[#11141C] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.04]'
+              }`}
+            >
+              <Database className="w-3.5 h-3.5" />
+              Active: {activeDataset.name}
+            </button>
+          )}
           <div className="relative">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
@@ -80,11 +105,28 @@ export function ExperimentHistoryView({ onOpenMonitor }: ExperimentHistoryViewPr
       )}
 
       {filtered.length === 0 ? (
-        <div className="rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] p-12 text-center">
-          <History className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+        <div className="rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#11141C] p-12 text-center space-y-3">
+          <History className="w-8 h-8 text-slate-400 mx-auto" />
           <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
-            No matching experiments
+            {onlyActiveDataset && activeDataset
+              ? `No experiments logged yet for "${activeDataset.name}"`
+              : 'No matching experiments'}
           </p>
+          {onlyActiveDataset && activeDataset && onNavigate && (
+            <div className="flex items-center justify-center gap-2">
+              <LiquidButton type="button" size="sm" variant="default" onClick={() => onNavigate('studio')}>
+                <FlaskConical className="w-3.5 h-3.5" />
+                Train on {activeDataset.name}
+              </LiquidButton>
+              <button
+                type="button"
+                onClick={() => setOnlyActiveDataset(false)}
+                className="px-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-white/[0.1] text-slate-600 dark:text-slate-300"
+              >
+                Show All Runs
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

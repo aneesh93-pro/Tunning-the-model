@@ -1,0 +1,11 @@
+customer_query,channel,support_category
+"Where is my package tracking number for order 4812?",email,shipping
+"I was billed twice on my monthly Pro invoice.",chat,billing
+"The API key returns 401 unauthorized after rotating tokens.",web,technical_support
+"Can I expedite overnight delivery for item SKU-99?",phone,shipping
+"Need a VAT receipt PDF for October payment.",email,billing
+"App crashes when exporting JSONL dataset on Safari.",web,technical_support
+"Track shipment delayed at Memphis hub.",chat,shipping
+"Refund still pending after canceling annual plan.",email,billing
+"Webhook signature verification fails on payload.",web,technical_support
+"Change shipping address before carrier pickup.",phone,shipping

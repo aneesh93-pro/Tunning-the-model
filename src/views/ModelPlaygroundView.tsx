@@ -25,7 +25,10 @@ import { api } from '../lib/api';
 import { useIsDark } from '../lib/useDarkMode';
 import { summarizePlaygroundBatchReports } from '../ml/structuredInference';
 import { mapPlaygroundToOrbState } from '@/utils/aiOrbState';
-import { pickPreferredDatasetId } from '../utils/datasetSelection';
+import {
+  buildPlaygroundPresetsFromDataset,
+  pickPreferredDatasetId,
+} from '../utils/datasetSelection';
 import type {
   DatasetRecord,
   PlaygroundBatchTestSummary,
@@ -59,19 +62,6 @@ const CHOICE_PRESETS: Array<{ label: string; value: string }> = [
   {
     label: 'Banking',
     value: 'card_lost_or_stolen, internal_transfer, balance_inquiry, fees_and_rates',
-  },
-];
-
-const QUICK_PROMPTS = [
-  {
-    label: 'Card Lost Intent',
-    prompt: 'I lost my debit card on the train this morning. Freeze it right away.',
-    choices: 'card_lost_or_stolen, internal_transfer, balance_inquiry, fees_and_rates',
-  },
-  {
-    label: 'Anti-Hallucination Probe (JEV AI)',
-    prompt: 'Verify whether "JEV AI" is an approved intent class or registered adapter in this workspace.',
-    choices: 'true, false, uncertain',
   },
 ];
 
@@ -255,6 +245,7 @@ export function ModelPlaygroundView({
 
   const [reports, setReports] = useState<PlaygroundTestReport[]>([]);
   const [activeReport, setActiveReport] = useState<PlaygroundTestReport | null>(null);
+  const [activePreviewRows, setActivePreviewRows] = useState<Record<string, unknown>[]>([]);
   const [testingModel, setTestingModel] = useState(false);
   const [testingAllModels, setTestingAllModels] = useState(false);
   const [testingRef, setTestingRef] = useState<string | null>(null);
@@ -285,6 +276,46 @@ export function ModelPlaygroundView({
       setReportError((err as Error).message);
     });
   }, [initialModelRef, initialDatasetId]);
+
+  useEffect(() => {
+    if (!selectedDatasetId) {
+      setActivePreviewRows([]);
+      return;
+    }
+    let cancelled = false;
+    api
+      .getDatasetDetail(selectedDatasetId)
+      .then((detail) => {
+        if (!cancelled) {
+          setActivePreviewRows(detail.previewRows ?? []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setActivePreviewRows([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDatasetId]);
+
+  const activeDataset = useMemo(
+    () => datasets.find((d) => d.id === selectedDatasetId) ?? null,
+    [datasets, selectedDatasetId]
+  );
+
+  const dynamicPresets = useMemo(
+    () => buildPlaygroundPresetsFromDataset(activeDataset, activePreviewRows),
+    [activeDataset, activePreviewRows]
+  );
+
+  const choicePresets = useMemo(() => {
+    if (!dynamicPresets.suggestedChoices) return CHOICE_PRESETS;
+    return [
+      CHOICE_PRESETS[0],
+      { label: 'Dataset Labels', value: dynamicPresets.suggestedChoices },
+      ...CHOICE_PRESETS.slice(1),
+    ];
+  }, [dynamicPresets.suggestedChoices]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -725,8 +756,8 @@ export function ModelPlaygroundView({
                 <label className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
                   Allowed Choices (comma-separated)
                 </label>
-                <div className="flex items-center gap-1.5">
-                  {CHOICE_PRESETS.map((p) => (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {choicePresets.map((p) => (
                     <button
                       key={p.label}
                       type="button"
@@ -951,6 +982,11 @@ export function ModelPlaygroundView({
                   <span className="font-medium text-slate-900 dark:text-slate-100 truncate">
                     {models.find((m) => m.ref === selectedRef)?.label || 'Select model'}
                   </span>
+                  {activeDataset && (
+                    <span className="hidden sm:inline-flex items-center gap-1 rounded-md border border-blue-500/25 bg-blue-500/10 px-2 py-0.5 text-[10px] font-mono text-blue-700 dark:text-blue-300 truncate max-w-[220px]">
+                      Dataset: {activeDataset.name}
+                    </span>
+                  )}
                 </div>
                 {streaming ? (
                   <AiOrb state="streaming" size="sm" showLabel label="Verifying output" />
@@ -1009,7 +1045,7 @@ export function ModelPlaygroundView({
                     </p>
 
                     <div className="pointer-events-auto mt-5 flex flex-wrap justify-center gap-1.5 max-w-lg">
-                      {QUICK_PROMPTS.map((qp) => (
+                      {dynamicPresets.quickPrompts.map((qp) => (
                         <button
                           key={qp.label}
                           type="button"
